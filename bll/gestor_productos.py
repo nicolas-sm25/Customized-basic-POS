@@ -47,13 +47,10 @@ def procesar_venta_simple(codigo_barras, cantidad=1):
             print(f"Alerta: No hay stock suficiente de {producto.nombre}. Stock actual: {producto.stock}")
             return False
             
-        # 2. Hacemos la venta (restamos stock)
         producto.stock -= cantidad
         
-        # 3. Guardamos los cambios
         sesion.commit()
         
-        # 4. Calculamos la ganancia (solo para mostrarla)
         total_venta = producto.precio_venta * cantidad
         ganancia = (producto.precio_venta - producto.costo) * cantidad
         
