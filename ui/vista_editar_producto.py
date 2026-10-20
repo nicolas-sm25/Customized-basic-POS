@@ -13,6 +13,7 @@ class VistaEditarProducto(ctk.CTkFrame):
 
         self.entry_busqueda = ctk.CTkEntry(self.frame_busqueda, placeholder_text="Código o Nombre...", width=200)
         self.entry_busqueda.grid(row=0, column=0, padx=5)
+        self.entry_busqueda.bind("<Return>", self.buscar_producto)
 
         self.btn_buscar = ctk.CTkButton(self.frame_busqueda, text="Buscar", command=self.buscar_producto)
         self.btn_buscar.grid(row=0, column=1, padx=5)
@@ -38,16 +39,19 @@ class VistaEditarProducto(ctk.CTkFrame):
         self.lbl_costo.grid(row=2, column=0, padx=5, pady=5)
         self.entry_costo = ctk.CTkEntry(self.frame_edicion, width=250, state="disabled")
         self.entry_costo.grid(row=2, column=1, padx=5, pady=5)
+        self.entry_costo.bind("<Return>", self.guardar_cambios)
 
         self.lbl_precio = ctk.CTkLabel(self.frame_edicion, text="Precio de Venta:", anchor="e", width=120)
         self.lbl_precio.grid(row=3, column=0, padx=5, pady=5)
         self.entry_precio = ctk.CTkEntry(self.frame_edicion, width=250, state="disabled")
         self.entry_precio.grid(row=3, column=1, padx=5, pady=5)
+        self.entry_precio.bind("<Return>", self.guardar_cambios)
 
         self.lbl_stock = ctk.CTkLabel(self.frame_edicion, text="Stock:", anchor="e", width=120)
         self.lbl_stock.grid(row=4, column=0, padx=5, pady=5)
         self.entry_stock = ctk.CTkEntry(self.frame_edicion, width=250, state="disabled")
         self.entry_stock.grid(row=4, column=1, padx=5, pady=5)
+        self.entry_stock.bind("<Return>", self.guardar_cambios)
 
         self.frame_botones = ctk.CTkFrame(self, fg_color="transparent")
         self.frame_botones.pack(pady=10)
@@ -61,7 +65,7 @@ class VistaEditarProducto(ctk.CTkFrame):
         self.lbl_mensaje = ctk.CTkLabel(self, text="")
         self.lbl_mensaje.pack(pady=5)
 
-    def buscar_producto(self):
+    def buscar_producto(self, event=None):
         criterio = self.entry_busqueda.get().strip()
         if not criterio:
             return
@@ -87,6 +91,8 @@ class VistaEditarProducto(ctk.CTkFrame):
             self.btn_guardar.configure(state="normal")
             self.btn_cancelar.configure(state="normal")
             self.lbl_mensaje.configure(text="Producto cargado. Ya puede editar costos y stock.", text_color="green")
+            
+            self.entry_costo.focus()
         else:
             self.cancelar_edicion()
             self.lbl_mensaje.configure(text="No se encontró ningún producto.", text_color="red")
@@ -102,7 +108,7 @@ class VistaEditarProducto(ctk.CTkFrame):
         self.entry_precio.insert(0, str(producto["precio_venta"]))
         self.entry_stock.insert(0, str(producto["stock"]))
 
-    def guardar_cambios(self):
+    def guardar_cambios(self, event=None):
         if not self.producto_id_actual:
             return
 
@@ -159,13 +165,13 @@ class VistaEditarProducto(ctk.CTkFrame):
         
         self.btn_guardar.configure(state="disabled")
         self.btn_cancelar.configure(state="disabled")
+        
+        self.entry_busqueda.focus()
 
     def limpiar_campos(self):
-        # Limpiamos los labels
         self.lbl_valor_nombre.configure(text="-")
         self.lbl_valor_codigo.configure(text="-")
         
-        # Limpiamos los entries
         self.cambiar_estado_campos("normal")
         self.entry_costo.delete(0, 'end')
         self.entry_precio.delete(0, 'end')
