@@ -1,5 +1,6 @@
 import customtkinter as ctk
-from ui.vista_productos import VistaAgregarProducto
+from ui.vista_agregar_productos import VistaAgregarProducto
+from ui.vista_editar_producto import VistaEditarProducto
 
 class VentanaPrincipal(ctk.CTk):
     def __init__(self):
@@ -21,15 +22,18 @@ class VentanaPrincipal(ctk.CTk):
         self.btn_caja = ctk.CTkButton(self.frame_menu, text="Caja", command=self.mostrar_caja)
         self.btn_caja.grid(row=1, column=0, padx=20, pady=10)
         
-        self.btn_productos = ctk.CTkButton(self.frame_menu, text="Gestión Productos", command=self.mostrar_productos)
+        self.btn_productos = ctk.CTkButton(self.frame_menu, text="Agregar Producto", command=self.mostrar_productos)
         self.btn_productos.grid(row=2, column=0, padx=20, pady=10)
+        
+        self.btn_editar = ctk.CTkButton(self.frame_menu, text="Editar Producto", command=self.mostrar_editar)
+        self.btn_editar.grid(row=3, column=0, padx=20, pady=10)
         
         self.frame_contenido = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.frame_contenido.grid(row=0, column=1, sticky="nsew")
         
         self.vista_actual = None
         
-        self.mostrar_productos()
+        self.mostrar_caja()
 
     def cambiar_vista(self, nueva_vista_clase):
         if self.vista_actual:
@@ -40,6 +44,9 @@ class VentanaPrincipal(ctk.CTk):
 
     def mostrar_productos(self):
         self.cambiar_vista(VistaAgregarProducto)
+
+    def mostrar_editar(self):
+        self.cambiar_vista(VistaEditarProducto)
 
     def mostrar_caja(self):
         if self.vista_actual:
