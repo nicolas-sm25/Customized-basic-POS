@@ -1,6 +1,6 @@
 import customtkinter as ctk
 
-FUENTE_TITULOS = ("Arial", 20, "bold")
+FUENTE_TITULOS = ("Arial", 24, "bold")
 FUENTE_NORMAL = ("Arial", 12)
 FUENTE_NEGRITA = ("Arial", 12, "bold")
 
@@ -38,7 +38,7 @@ def nueva_caja_texto(master, placeholder = ""):
     return ctk.CTkEntry(
         master, 
         placeholder_text = placeholder, 
-        width = 0, 
+        width = 250, 
         state = "normal"
     )
 
@@ -52,5 +52,5 @@ def nuevo_boton(master, texto, comando, fuente=FUENTE_NORMAL, color_fondo=None, 
         fg_color = color_fondo, 
         hover_color = color_hover, 
         state = "normal", 
-        width = 0
+        width = 140
     )

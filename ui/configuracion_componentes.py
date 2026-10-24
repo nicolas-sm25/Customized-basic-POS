@@ -1,6 +1,6 @@
 import customtkinter as ctk
 
-class VistaFormularioBase(ctk.CTkFrame):
+class ConfiguracionComponentes(ctk.CTkFrame):
     """
     Clase padre para todas las vistas que contengan formularios.
     Centraliza la limpieza y el bloqueo/desbloqueo de campos.
