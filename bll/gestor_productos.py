@@ -5,6 +5,16 @@ def agregar_producto(nombre, costo, precio_venta, codigo_barras=None, stock=0):
     sesion = SessionLocal()
     
     try:
+        
+        producto_existente = SessionLocal().query(Producto).filter(Producto.nombre == nombre).first()
+        if producto_existente:
+            return False, f"Error: Ya existe un producto llamado '{nombre}'."
+        
+        if codigo_barras:
+            codigo_existente = SessionLocal().query(Producto).filter(Producto.codigo_barras == codigo_barras).first()
+            if codigo_existente:
+                return False, f"Error: El código de barras '{codigo_barras}' ya está registrado."
+        
         nuevo_producto = Producto(
             nombre=nombre,
             costo=costo,
