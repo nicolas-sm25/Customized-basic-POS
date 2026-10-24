@@ -1,70 +1,107 @@
-import customtkinter as ctk
 from bll.gestor_productos import buscar_producto_por_codigo, buscar_productos_por_nombre, actualizar_producto
+from ui.configuracion_componentes import ConfiguracionComponentes
+from ui.creador_componentes import *
 
-class VistaEditarProducto(ctk.CTkFrame):
+class VistaEditarProducto(ConfiguracionComponentes):
     def __init__(self, master):
         super().__init__(master)
-
-        self.lbl_titulo = ctk.CTkLabel(self, text="Buscar y Editar Producto", font=("Arial", 20, "bold"))
+        
+        # --- TÍTULO ---
+        self.lbl_titulo = nuevo_label(self, "Buscar y Editar Producto", fuente=FUENTE_TITULOS)
         self.lbl_titulo.pack(pady=15)
-
-        self.frame_busqueda = ctk.CTkFrame(self, fg_color="transparent")
+        
+        
+        # --- BÚSQUEDA DE PRODUCTOS ---
+        self.frame_busqueda = nuevo_frame(self)
         self.frame_busqueda.pack(pady=5)
 
-        self.entry_busqueda = ctk.CTkEntry(self.frame_busqueda, placeholder_text="Código o Nombre...", width=200)
+        self.entry_busqueda = nueva_caja_texto(self.frame_busqueda, placeholder="Código o Nombre...")
         self.entry_busqueda.grid(row=0, column=0, padx=5)
         self.entry_busqueda.bind("<Return>", self.buscar_producto)
 
-        self.btn_buscar = ctk.CTkButton(self.frame_busqueda, text="Buscar", command=self.buscar_producto)
+        self.btn_buscar = nuevo_boton(self.frame_busqueda, "Buscar", comando=self.buscar_producto)
         self.btn_buscar.grid(row=0, column=1, padx=5)
 
+        # --- INFO PRINCIPAL DE PRODUCTOS ---
+        self.frame_edicion = nuevo_frame(self)
+        self.frame_edicion.pack(pady=15)
+
+        self.lbl_nombre = nuevo_label(self.frame_edicion, "Nombre:", fuente=FUENTE_NEGRITA, poscicion="e")
+        self.lbl_nombre.grid(row=0, column=0, padx=5, pady=5)
+        self.lbl_valor_nombre = nuevo_label(self.frame_edicion, "-", poscicion="w")
+        self.lbl_valor_nombre.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        self.lbl_codigo = nuevo_label(self.frame_edicion, "Código de Barras:", fuente=FUENTE_NEGRITA, poscicion="e")
+        self.lbl_codigo.grid(row=1, column=0, padx=5, pady=5)
+        self.lbl_valor_codigo = nuevo_label(self.frame_edicion, "-", poscicion="w")
+        self.lbl_valor_codigo.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        
+        
+        # --- ACTUALIZAR INFO ---
+        self.lbl_costo = nuevo_label(self.frame_edicion, "Costo:", poscicion="e")
+        self.lbl_costo.grid(row=2, column=0, padx=5, pady=5)
+        self.entry_costo = nueva_caja_texto(self.frame_edicion)
+        self.entry_costo.grid(row=2, column=1, padx=5, pady=5)
+        self.entry_costo.configure(state="disabled") 
+        self.entry_costo.bind("<Return>", lambda event: self.entry_precio.focus())
+        self.entry_costo.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
+
+        self.lbl_precio = nuevo_label(self.frame_edicion, "Precio de Venta:", poscicion="e")
+        self.lbl_precio.grid(row=3, column=0, padx=5, pady=5)
+        self.entry_precio = nueva_caja_texto(self.frame_edicion)
+        self.entry_precio.grid(row=3, column=1, padx=5, pady=5)
+        self.entry_precio.configure(state="disabled") 
+        self.entry_precio.bind("<Return>", lambda event: self.entry_stock.focus())
+        self.entry_precio.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
+
+        self.lbl_stock = nuevo_label(self.frame_edicion, "Stock:", poscicion="e")
+        self.lbl_stock.grid(row=4, column=0, padx=5, pady=5)
+        self.entry_stock = nueva_caja_texto(self.frame_edicion)
+        self.entry_stock.grid(row=4, column=1, padx=5, pady=5)
+        self.entry_stock.configure(state="disabled") 
+        self.entry_stock.bind("<Return>", self.guardar_cambios)
+        self.entry_stock.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
+        
+        # --- BOTONES ---
+        self.frame_botones = nuevo_frame(self)
+        self.frame_botones.pack(pady=10)
+
+        self.btn_guardar = nuevo_boton(self.frame_botones, "Guardar Cambios", comando=self.guardar_cambios, color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER)
+        self.btn_guardar.grid(row=0, column=0, padx=10)
+        self.btn_guardar.configure(state="disabled")
+
+        self.btn_cancelar = nuevo_boton(self.frame_botones, "Cancelar", lambda: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER)
+        self.btn_cancelar.grid(row=0, column=1, padx=10)
+        self.btn_cancelar.configure(state="disabled")
+
+        # --- MENSAJE DE ESTADO ---
+        self.lbl_mensaje = nuevo_label(self, "")
+        self.lbl_mensaje.pack(pady=5)
+
+        # --- LISTA DE ENTRADAS EDITABLES PARA LIMPIEZA Y BLOQUEO ---
+        self.entradas_editables = [self.entry_costo, self.entry_precio, self.entry_stock]
+        self.labels_estaticos = [self.lbl_valor_nombre, self.lbl_valor_codigo]
+        self.botones_accion = [self.btn_guardar, self.btn_cancelar]
+        self.elementos_busqueda = [self.entry_busqueda, self.btn_buscar]
+        
+        # --- VARIABLES DE ESTADO ---
         self.producto_id_actual = None
         self.nombre_actual = None
         self.codigo_actual = None
+        
+    # --- MOSTRAR RESULTADOS DE LA BUSQUEDA EN PANTALLA ---    
+    def cargar_datos_en_pantalla(self, producto):
+            self.limpiar_campos()
+            
+            self.lbl_valor_nombre.configure(text=producto["nombre"])
+            self.lbl_valor_codigo.configure(text=producto["codigo_barras"] if producto["codigo_barras"] else "N/A")
+            
+            self.habilitar(self.entradas_editables)
+            self.entry_costo.insert(0, str(producto["costo"]))
+            self.entry_precio.insert(0, str(producto["precio_venta"]))
+            self.entry_stock.insert(0, str(producto["stock"]))
 
-        self.frame_edicion = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_edicion.pack(pady=15)
-
-        self.lbl_nombre = ctk.CTkLabel(self.frame_edicion, text="Nombre:", anchor="e", width=120, font=("Arial", 12, "bold"))
-        self.lbl_nombre.grid(row=0, column=0, padx=5, pady=5)
-        self.lbl_valor_nombre = ctk.CTkLabel(self.frame_edicion, text="-", anchor="w", width=250)
-        self.lbl_valor_nombre.grid(row=0, column=1, padx=5, pady=5, sticky="w")
-
-        self.lbl_codigo = ctk.CTkLabel(self.frame_edicion, text="Código de Barras:", anchor="e", width=120, font=("Arial", 12, "bold"))
-        self.lbl_codigo.grid(row=1, column=0, padx=5, pady=5)
-        self.lbl_valor_codigo = ctk.CTkLabel(self.frame_edicion, text="-", anchor="w", width=250)
-        self.lbl_valor_codigo.grid(row=1, column=1, padx=5, pady=5, sticky="w")
-
-        self.lbl_costo = ctk.CTkLabel(self.frame_edicion, text="Costo:", anchor="e", width=120)
-        self.lbl_costo.grid(row=2, column=0, padx=5, pady=5)
-        self.entry_costo = ctk.CTkEntry(self.frame_edicion, width=250, state="disabled")
-        self.entry_costo.grid(row=2, column=1, padx=5, pady=5)
-        self.entry_costo.bind("<Return>", self.guardar_cambios)
-
-        self.lbl_precio = ctk.CTkLabel(self.frame_edicion, text="Precio de Venta:", anchor="e", width=120)
-        self.lbl_precio.grid(row=3, column=0, padx=5, pady=5)
-        self.entry_precio = ctk.CTkEntry(self.frame_edicion, width=250, state="disabled")
-        self.entry_precio.grid(row=3, column=1, padx=5, pady=5)
-        self.entry_precio.bind("<Return>", self.guardar_cambios)
-
-        self.lbl_stock = ctk.CTkLabel(self.frame_edicion, text="Stock:", anchor="e", width=120)
-        self.lbl_stock.grid(row=4, column=0, padx=5, pady=5)
-        self.entry_stock = ctk.CTkEntry(self.frame_edicion, width=250, state="disabled")
-        self.entry_stock.grid(row=4, column=1, padx=5, pady=5)
-        self.entry_stock.bind("<Return>", self.guardar_cambios)
-
-        self.frame_botones = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_botones.pack(pady=10)
-
-        self.btn_guardar = ctk.CTkButton(self.frame_botones, text="Guardar Cambios", command=self.guardar_cambios, state="disabled", fg_color="green", hover_color="darkgreen")
-        self.btn_guardar.grid(row=0, column=0, padx=10)
-
-        self.btn_cancelar = ctk.CTkButton(self.frame_botones, text="Cancelar", command=self.cancelar_edicion, state="disabled", fg_color="red", hover_color="darkred")
-        self.btn_cancelar.grid(row=0, column=1, padx=10)
-
-        self.lbl_mensaje = ctk.CTkLabel(self, text="")
-        self.lbl_mensaje.pack(pady=5)
-
+    # --- BÚSQUEDA DE PRODUCTOS EN LA DB ---
     def buscar_producto(self, event=None):
         criterio = self.entry_busqueda.get().strip()
         if not criterio:
@@ -82,32 +119,16 @@ class VistaEditarProducto(ctk.CTkFrame):
             self.nombre_actual = producto["nombre"]
             self.codigo_actual = producto["codigo_barras"]
             
-            self.entry_busqueda.configure(state="disabled")
-            self.btn_buscar.configure(state="disabled")
-            
+            self.deshabilitar(self.elementos_busqueda)
             self.cargar_datos_en_pantalla(producto)
-            self.cambiar_estado_campos("normal")
+            self.habilitar(self.entradas_editables, self.botones_accion)
             
-            self.btn_guardar.configure(state="normal")
-            self.btn_cancelar.configure(state="normal")
-            self.lbl_mensaje.configure(text="Producto cargado. Ya puede editar costos y stock.", text_color="green")
-            
+            self.lbl_mensaje.configure(text="Producto cargado. Ya puede editar costos y stock.", text_color=COLOR_EXITO)
             self.entry_costo.focus()
         else:
-            self.cancelar_edicion()
-            self.lbl_mensaje.configure(text="No se encontró ningún producto.", text_color="red")
+            self.reiniciar_pantalla(mensaje="No se encontró ningún producto.", color=COLOR_FALLO)
 
-    def cargar_datos_en_pantalla(self, producto):
-        self.limpiar_campos()
-        
-        self.lbl_valor_nombre.configure(text=producto["nombre"])
-        self.lbl_valor_codigo.configure(text=producto["codigo_barras"] if producto["codigo_barras"] else "N/A")
-        
-        self.cambiar_estado_campos("normal")
-        self.entry_costo.insert(0, str(producto["costo"]))
-        self.entry_precio.insert(0, str(producto["precio_venta"]))
-        self.entry_stock.insert(0, str(producto["stock"]))
-
+    # --- GUARDAR NUEVA INFO EN LA DB ---
     def guardar_cambios(self, event=None):
         if not self.producto_id_actual:
             return
@@ -117,7 +138,7 @@ class VistaEditarProducto(ctk.CTkFrame):
         stock_str = self.entry_stock.get()
 
         if not costo_str or not precio_str:
-            self.lbl_mensaje.configure(text="El costo y el precio son obligatorios.", text_color="red")
+            self.lbl_mensaje.configure(text="El costo y el precio son obligatorios.", text_color=COLOR_FALLO)
             return
 
         try:
@@ -126,7 +147,7 @@ class VistaEditarProducto(ctk.CTkFrame):
             stock = int(stock_str) if stock_str else 0
 
             if costo < 0 or precio < 0 or stock < 0:
-                self.lbl_mensaje.configure(text="No se admiten valores negativos.", text_color="red")
+                self.lbl_mensaje.configure(text="No se admiten valores negativos.", text_color=COLOR_FALLO)
                 return
 
             exito, mensaje = actualizar_producto(
@@ -139,45 +160,26 @@ class VistaEditarProducto(ctk.CTkFrame):
             )
 
             if exito:
-                self.lbl_mensaje.configure(text=mensaje, text_color="green")
-                self.deshabilitar_edicion()
+                self.reiniciar_pantalla(mensaje="Cambios guardados exitosamente.", color=COLOR_EXITO)
             else:
-                self.lbl_mensaje.configure(text=mensaje, text_color="red")
+                self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 
         except ValueError:
-            self.lbl_mensaje.configure(text="Costo, precio y stock deben ser números.", text_color="red")
+            self.lbl_mensaje.configure(text="Costo, precio y stock deben ser números.", text_color=COLOR_FALLO)
 
-    def cancelar_edicion(self):
-        self.deshabilitar_edicion()
-        self.lbl_mensaje.configure(text="Edición cancelada.", text_color="gray")
 
-    def deshabilitar_edicion(self):
+    # --- RESETEO AL ESTADO INICIAL DE BUSQUEDA ---
+    def reiniciar_pantalla(self, mensaje="Edición finalizada.", color="gray"):
+        
         self.producto_id_actual = None
         self.nombre_actual = None
         self.codigo_actual = None
         
-        self.entry_busqueda.configure(state="normal")
-        self.btn_buscar.configure(state="normal")
-        self.entry_busqueda.delete(0, 'end')
-        
         self.limpiar_campos()
-        self.cambiar_estado_campos("disabled")
+        self.deshabilitar(self.entradas_editables, self.botones_accion)
+        self.habilitar(self.elementos_busqueda)
         
-        self.btn_guardar.configure(state="disabled")
-        self.btn_cancelar.configure(state="disabled")
-        
+        self.entry_busqueda.delete(0, 'end')
         self.entry_busqueda.focus()
-
-    def limpiar_campos(self):
-        self.lbl_valor_nombre.configure(text="-")
-        self.lbl_valor_codigo.configure(text="-")
         
-        self.cambiar_estado_campos("normal")
-        self.entry_costo.delete(0, 'end')
-        self.entry_precio.delete(0, 'end')
-        self.entry_stock.delete(0, 'end')
-
-    def cambiar_estado_campos(self, nuevo_estado):
-        self.entry_costo.configure(state=nuevo_estado)
-        self.entry_precio.configure(state=nuevo_estado)
-        self.entry_stock.configure(state=nuevo_estado)
+        self.lbl_mensaje.configure(text=mensaje, text_color=color)
