@@ -42,6 +42,11 @@ class ConfiguracionComponentes(ctk.CTkFrame):
             
             for entrada in self.entradas_editables:
                 entrada.delete(0, 'end')
+                
+                texto_placeholder = entrada.cget("placeholder_text")
+                if texto_placeholder:
+                    entrada.configure(placeholder_text="")
+                    entrada.configure(placeholder_text=texto_placeholder)
 
             for entrada in self.entradas_editables:
                 entrada.configure(state=estado_anterior)
