@@ -1,9 +1,9 @@
 import customtkinter as ctk
 
-from ui.creador_componentes import *
-from ui.vista_agregar_productos import VistaAgregarProducto
-from ui.vista_caja import VistaCaja
-from ui.vista_editar_producto import VistaEditarProducto
+from ui.componentes.creador_componentes import *
+from ui.vistas.vista_agregar_productos import VistaAgregarProducto
+from ui.vistas.vista_caja import VistaCaja
+from ui.vistas.vista_editar_producto import VistaEditarProducto
 
 class VentanaPrincipal(ctk.CTk):
     def __init__(self):

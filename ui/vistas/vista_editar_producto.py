@@ -1,6 +1,6 @@
 from bll.gestor_productos import buscar_producto_por_codigo, buscar_productos_por_nombre, actualizar_producto
-from ui.configuracion_componentes import ConfiguracionComponentes
-from ui.creador_componentes import *
+from ui.componentes.configuracion_componentes import ConfiguracionComponentes
+from ui.componentes.creador_componentes import *
 
 class VistaEditarProducto(ConfiguracionComponentes):
     def __init__(self, master):
@@ -42,7 +42,8 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.lbl_costo.grid(row=2, column=0, padx=5, pady=5)
         self.entry_costo = nueva_caja_texto(self.frame_edicion)
         self.entry_costo.grid(row=2, column=1, padx=5, pady=5)
-        self.entry_costo.configure(state="disabled") 
+        self.entry_costo.configure(state="disabled")
+        self.entry_costo.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_costo)) 
         self.entry_costo.bind("<Return>", lambda event: self.entry_precio.focus())
         self.entry_costo.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
 
@@ -50,7 +51,8 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.lbl_precio.grid(row=3, column=0, padx=5, pady=5)
         self.entry_precio = nueva_caja_texto(self.frame_edicion)
         self.entry_precio.grid(row=3, column=1, padx=5, pady=5)
-        self.entry_precio.configure(state="disabled") 
+        self.entry_precio.configure(state="disabled")
+        self.entry_precio.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_precio)) 
         self.entry_precio.bind("<Return>", lambda event: self.entry_stock.focus())
         self.entry_precio.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
 
@@ -58,7 +60,8 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.lbl_stock.grid(row=4, column=0, padx=5, pady=5)
         self.entry_stock = nueva_caja_texto(self.frame_edicion)
         self.entry_stock.grid(row=4, column=1, padx=5, pady=5)
-        self.entry_stock.configure(state="disabled") 
+        self.entry_stock.configure(state="disabled")
+        self.entry_stock.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_stock)) 
         self.entry_stock.bind("<Return>", self.guardar_cambios)
         self.entry_stock.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
         
@@ -97,8 +100,8 @@ class VistaEditarProducto(ConfiguracionComponentes):
             self.lbl_valor_codigo.configure(text=producto["codigo_barras"] if producto["codigo_barras"] else "N/A")
             
             self.habilitar(self.entradas_editables)
-            self.entry_costo.insert(0, str(producto["costo"]))
-            self.entry_precio.insert(0, str(producto["precio_venta"]))
+            self.entry_costo.insert(0, str(int(producto["costo"])))
+            self.entry_precio.insert(0, str(int(producto["precio_venta"])))
             self.entry_stock.insert(0, str(producto["stock"]))
 
     # --- BÚSQUEDA DE PRODUCTOS EN LA DB ---
@@ -133,9 +136,9 @@ class VistaEditarProducto(ConfiguracionComponentes):
         if not self.producto_id_actual:
             return
 
-        costo_str = self.entry_costo.get()
-        precio_str = self.entry_precio.get()
-        stock_str = self.entry_stock.get()
+        costo_str = self.entry_costo.get().replace(".", "").strip()
+        precio_str = self.entry_precio.get().replace(".", "").strip()
+        stock_str = self.entry_stock.get().replace(".", "").strip()
 
         if not costo_str or not precio_str:
             self.lbl_mensaje.configure(text="El costo y el precio son obligatorios.", text_color=COLOR_FALLO)

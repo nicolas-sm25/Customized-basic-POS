@@ -56,3 +56,16 @@ class ConfiguracionComponentes(ctk.CTkFrame):
 
         if entrada_enfocada:
             entrada_enfocada.focus()
+
+    def formatear_entrada_moneda(self, entry):
+        """Toma el valor actual de un CTkEntry, le pone puntos de miles y lo actualiza."""
+        texto_actual = entry.get().replace(".", "")
+
+        texto_limpio = ''.join(filter(str.isdigit, texto_actual))
+        
+        entry.delete(0, 'end')
+        
+        if texto_limpio:
+
+            texto_formateado = f"{int(texto_limpio):,}".replace(",", ".")
+            entry.insert(0, texto_formateado)

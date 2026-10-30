@@ -1,6 +1,6 @@
 from bll.gestor_productos import agregar_producto
-from ui.configuracion_componentes import ConfiguracionComponentes
-from ui.creador_componentes import *
+from ui.componentes.configuracion_componentes import ConfiguracionComponentes
+from ui.componentes.creador_componentes import *
 
 class VistaAgregarProducto(ConfiguracionComponentes):
     def __init__(self, master):
@@ -25,17 +25,20 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         self.entry_costo.pack(pady=10)
         self.entry_costo.bind("<Return>", lambda event: self.entry_precio.focus())
         self.entry_costo.bind("<Escape>", lambda event: self.cancelar_registro())
+        self.entry_costo.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_costo))
         
         self.entry_precio = nueva_caja_texto(self, placeholder="Precio de Venta")
         self.entry_precio.pack(pady=10)
         self.entry_precio.bind("<Return>", lambda event: self.entry_stock.focus())
         self.entry_precio.bind("<Escape>", lambda event: self.cancelar_registro())
-        
+        self.entry_precio.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_precio))
+
         self.entry_stock = nueva_caja_texto(self, placeholder="Stock Inicial")
         self.entry_stock.pack(pady=10)
         self.entry_stock.bind("<Return>", self.guardar_producto)
         self.entry_stock.bind("<Escape>", lambda event: self.cancelar_registro())
-        
+        self.entry_stock.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_stock))
+
         # --- BOTONES ---
         self.frame_botones = nuevo_frame(self)
         self.frame_botones.pack(pady=20)
@@ -60,9 +63,9 @@ class VistaAgregarProducto(ConfiguracionComponentes):
     def guardar_producto(self, event=None): 
         nombre = self.entry_nombre.get()
         codigo = self.entry_codigo.get()
-        costo_str = self.entry_costo.get()
-        precio_str = self.entry_precio.get()
-        stock_str = self.entry_stock.get()
+        costo_str = self.entry_costo.get().replace(".", "").strip()
+        precio_str = self.entry_precio.get().replace(".", "").strip()
+        stock_str = self.entry_stock.get().replace(".", "").strip()
 
         if not nombre or not costo_str or not precio_str:
             self.lbl_mensaje.configure(text="Nombre, costo y precio son obligatorios.", text_color="red")
