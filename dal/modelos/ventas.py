@@ -8,13 +8,16 @@ class Venta(Base):
     __tablename__ = 'ventas'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
+    caja_id = Column(Integer, ForeignKey('contabilidad_caja.id'), nullable=True)
     fecha_hora = Column(DateTime, default=datetime.now)
     pagado = Column(Boolean, default=False)
+    metodo_pago = Column(String, default="Efectivo", nullable=True)
     referencia = Column(String, nullable=True)
     total = Column(Float, default=0.0)
     ganancia_total = Column(Float, default=0.0)
     
     detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
+    caja = relationship("ContabilidadCaja", back_populates="ventas")
 
 class DetalleVenta(Base):
     __tablename__ = 'detalles_venta'
