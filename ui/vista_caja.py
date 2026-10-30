@@ -1,5 +1,6 @@
+from bll.gestor_ventas import registrar_venta
 from bll.gestor_productos import buscar_producto_por_codigo, buscar_productos_por_nombre
-from bll.gestor_caja import obtener_caja_abierta, abrir_caja, cerrar_caja
+from bll.gestor_caja import *
 from ui.configuracion_componentes import *
 from ui.creador_componentes import *
 
@@ -13,11 +14,7 @@ class VistaCaja(ConfiguracionComponentes):
         self.frame_principal.pack(fill="both", expand=True)
 
         self.verificar_estado_caja()
-        
-        self.entradas_editables = [
-                    self.entry_buscar_prod
-                ]
-        
+
     # --- VERIFICAR SI LA CAJA ESTÁ ACTIVA ---
     def verificar_estado_caja(self):
         """Consulta al BLL y dibuja la interfaz correspondiente."""
@@ -85,6 +82,8 @@ class VistaCaja(ConfiguracionComponentes):
     # --- MENÚ VENTAS ---
     def mostrar_pantalla_ventas(self, caja_activa):
         self.carrito = [] # * ---> Inicializacion del carrito
+
+        self.caja_activa_id = caja_activa.id
 
         self.frame_principal.grid_columnconfigure(0, weight=3, uniform="grupo1")
         self.frame_principal.grid_columnconfigure(1, weight=1, uniform="grupo1")
@@ -158,10 +157,6 @@ class VistaCaja(ConfiguracionComponentes):
         modal.transient(self.winfo_toplevel())
         modal.grab_set()
 
-        # Atajos de teclado
-        modal.bind("<Escape>", lambda event: modal.destroy())
-        # modal.bind("<Return>", lambda event: print("Lógica cobrar efectivo (Atajo Enter)")) ---> Se implementa luego
-
         # Diseño del pop-up
         frame_modal = nuevo_frame(modal)
         frame_modal.pack(expand=True, fill="both", padx=20, pady=20)
@@ -180,7 +175,7 @@ class VistaCaja(ConfiguracionComponentes):
         btn_efectivo = nuevo_boton(
             frame_botones, 
             "Efectivo (Enter)", 
-            comando=lambda: print("Lógica cobrar efectivo"),
+            comando=lambda: self.procesar_cobro("Efectivo", modal),
             color_fondo=COLOR_EXITO,
             color_hover=COLOR_EXITO_HOVER
         )
@@ -190,7 +185,7 @@ class VistaCaja(ConfiguracionComponentes):
         btn_nequi = nuevo_boton(
             frame_botones, 
             "Nequi", 
-            comando=lambda: print("Lógica cobrar nequi"),
+            comando=lambda: self.procesar_cobro("Nequi", modal),
             color_fondo="#5e17eb", 
             color_hover="#4a11c0"
         )
@@ -205,6 +200,10 @@ class VistaCaja(ConfiguracionComponentes):
             color_hover=COLOR_FALLO_HOVER
         )
         btn_regresar.pack(side="bottom", pady=10)
+
+        # Atajos de teclado
+        modal.bind("<Escape>", lambda event: modal.destroy())
+        modal.bind("<Return>", lambda event: self.procesar_cobro("Efectivo", modal))
     
     # --- POP-UP CIERRE DE CAJA ---    
     def confirmar_cierre_caja(self):
@@ -408,3 +407,26 @@ class VistaCaja(ConfiguracionComponentes):
             
         self.actualizar_ui_carrito()
         self.entry_buscar_prod.focus()
+
+    # --- ENVIAR VENTA A BLL ---
+    def procesar_cobro(self, metodo_pago, modal_referencia):
+        """Envía el carrito al BLL para guardar la venta y limpia la interfaz."""
+        if not self.carrito:
+            return
+
+        exito, mensaje = registrar_venta(
+            carrito=self.carrito, 
+            metodo_pago=metodo_pago, 
+            caja_id=self.caja_activa_id
+        )
+
+        if exito:
+
+            self.carrito.clear()
+            self.actualizar_ui_carrito()
+            modal_referencia.destroy()
+
+            self.entry_buscar_prod.focus()
+            print("¡Venta Exitosa!")
+        else:
+            print(mensaje)
