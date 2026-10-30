@@ -33,6 +33,9 @@ class ConfiguracionComponentes(ctk.CTkFrame):
 
     def limpiar_campos(self):
         """Limpia todos los labels y cajas de texto de forma segura."""
+        entrada_enfocada = self.focus_get()
+        self.focus()
+
         for label in self.labels_estaticos:
             label.configure(text="-")
             
@@ -50,3 +53,6 @@ class ConfiguracionComponentes(ctk.CTkFrame):
 
             for entrada in self.entradas_editables:
                 entrada.configure(state=estado_anterior)
+
+        if entrada_enfocada:
+            entrada_enfocada.focus()
