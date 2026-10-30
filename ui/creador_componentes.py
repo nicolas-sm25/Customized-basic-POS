@@ -42,7 +42,7 @@ def nueva_caja_texto(master, placeholder = ""):
         state = "normal"
     )
 
-def nuevo_boton(master, texto, comando, fuente=FUENTE_NORMAL, color_fondo=None, color_hover=None):
+def nuevo_boton(master, texto, comando, fuente=FUENTE_NORMAL, color_fondo=None, color_hover=None, ancho = 140):
     """Crea un botón"""
     return ctk.CTkButton(
         master, 
@@ -52,5 +52,5 @@ def nuevo_boton(master, texto, comando, fuente=FUENTE_NORMAL, color_fondo=None, 
         fg_color = color_fondo, 
         hover_color = color_hover, 
         state = "normal", 
-        width = 140
+        width = ancho
     )
