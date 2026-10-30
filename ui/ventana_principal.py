@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 from ui.creador_componentes import *
 from ui.vista_agregar_productos import VistaAgregarProducto
+from ui.vista_caja import VistaCaja
 from ui.vista_editar_producto import VistaEditarProducto
 
 class VentanaPrincipal(ctk.CTk):
@@ -47,15 +48,10 @@ class VentanaPrincipal(ctk.CTk):
             
         self.vista_actual = nueva_vista_clase(self.frame_contenido)
         self.vista_actual.pack(fill="both", expand=True, padx=20, pady=20)
-        
+
     # --- MÉTODOS DE LOS BOTONES DEL MENÚ ---
     def mostrar_caja(self):
-        """Pantalla predeterminada temporal"""
-        if self.vista_actual:
-            self.vista_actual.destroy()
-            
-        self.vista_actual = nuevo_label(self.frame_contenido, "Pantalla de Caja (En construcción)", fuente=FUENTE_TITULOS)
-        self.vista_actual.pack(expand=True)
+        self.cambiar_vista(VistaCaja)
 
     def mostrar_agregar(self):
         self.cambiar_vista(VistaAgregarProducto)
