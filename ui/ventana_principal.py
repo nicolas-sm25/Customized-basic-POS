@@ -78,7 +78,10 @@ class VentanaPrincipal(ctk.CTk):
 
     def mostrar_caja(self): self.cambiar_vista(VistaCaja)
     def mostrar_agregar(self): self.cambiar_vista(VistaAgregarProducto)
-    def mostrar_editar(self): self.cambiar_vista(VistaEditarProducto)
+    def mostrar_editar(self, criterio_busqueda=None):
+        self.cambiar_vista(VistaEditarProducto)
+        if criterio_busqueda:
+            self.after(10, lambda: self.vista_actual.buscar_externamente(criterio_busqueda))
     def mostrar_inventario(self): self.cambiar_vista(VistaInventario)
     def mostrar_historial(self): self.cambiar_vista(VistaHistorial)
     

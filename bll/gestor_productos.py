@@ -93,20 +93,22 @@ def actualizar_producto(id_producto, nombre, costo, precio_venta, codigo_barras,
             return False, "Producto no encontrado en la base de datos."
         
         stock_antiguo = producto.stock
-        if stock_nuevo < stock_antiguo:
-            return False, "No se puede reducir el stock desde la edición. El stock solo puede aumentar o mantenerse."
-        
         diferencia_stock = stock_nuevo - stock_antiguo
 
-        if diferencia_stock > 0:
+        # Si el stock cambia (ya sea positivo o negativo), ajustamos la relación maestro/paquete
+        if diferencia_stock != 0:
             if producto.es_paquete and producto.producto_base_id:
                 producto_base = sesion.query(Producto).filter(Producto.id == producto.producto_base_id).first()
                 if producto_base:
+                    # Sumamos o restamos a la base multiplicando por la cantidad del paquete
                     producto_base.stock += (diferencia_stock * producto.cantidad_por_paquete)
+                    
             else:
                 paquetes_vinculados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
                 for paquete in paquetes_vinculados:
-                    paquete.stock = (producto.stock + diferencia_stock) // paquete.cantidad_por_paquete
+                    # Recalculamos los paquetes disponibles con la nueva cantidad de la base
+                    nuevo_stock_base = producto.stock + diferencia_stock
+                    paquete.stock = nuevo_stock_base // paquete.cantidad_por_paquete
         
         producto.nombre = nombre
         producto.costo = costo

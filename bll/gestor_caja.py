@@ -153,10 +153,13 @@ def obtener_historial_cajas():
             ganancia_bruta = c.ganancia_total if c.ganancia_total else 0
             nombre_encargado = c.usuario.nombre if c.usuario else "Desconocido"
             
+            fecha_cierre_str = c.fecha_cierre.strftime("%d/%m/%Y %I:%M %p") if c.fecha_cierre else "En curso..."
+            
             resultado.append({
                 "id": c.id,
-                "encargado": nombre_encargado, # <- NUEVO
-                "fecha": c.fecha_apertura.strftime("%d/%m/%Y %H:%M") if c.fecha_apertura else "N/A",
+                "encargado": nombre_encargado,
+                "fecha_apertura": c.fecha_apertura.strftime("%d/%m/%Y %I:%M %p") if c.fecha_apertura else "N/A",
+                "fecha_cierre": fecha_cierre_str,
                 "base": c.base_efectivo,
                 "ventas": c.ventas_efectivo + c.ventas_nequi,
                 "gastos": c.gastos_totales,

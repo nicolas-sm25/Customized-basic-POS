@@ -102,12 +102,16 @@ class VistaCaja(ConfiguracionComponentes):
         self.frame_principal.grid_columnconfigure(1, weight=1, uniform="grupo1")
         self.frame_principal.grid_rowconfigure(0, weight=1)
 
-        # --- FRAMES ---
+        # --- FRAMES PRINCIPALES ---
         frame_izquierdo = nuevo_frame(self.frame_principal)
         frame_izquierdo.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
-        frame_derecho = nuevo_frame(self.frame_principal)
+        frame_derecho = nuevo_frame(self.frame_principal, color_fondo="#2b2b2b")
         frame_derecho.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        
+        # --- PANEL DERECHO ---
+        frame_derecho.grid_rowconfigure(1, weight=1)
+        frame_derecho.grid_columnconfigure(0, weight=1)
         
         frame_busqueda = nuevo_frame(frame_izquierdo)
         frame_busqueda.pack(fill="x", pady=(0, 10))
@@ -115,10 +119,19 @@ class VistaCaja(ConfiguracionComponentes):
         self.frame_carrito = nuevo_frame(frame_izquierdo, color_fondo="#202020")
         self.frame_carrito.pack(fill="both", expand=True)
         
-        frame_totales = nuevo_frame(frame_derecho, color_fondo="transparent")
-        frame_totales.pack(side="top", fill="both", expand=True)
+        # --- 1. CONTENEDOR SUPERIOR FIJO (Acciones) ---
+        frame_acciones = nuevo_frame(frame_derecho, color_fondo="transparent")
+        frame_acciones.grid(row=0, column=0, sticky="nsew", pady=(5, 0))
         
-        # --- BUSQUEDA Y AGREGAR AL CARRITO ---
+        # --- 2. CONTENEDOR CENTRAL FLEXIBLE (Recibo) ---
+        frame_recibo_container = nuevo_frame(frame_derecho, color_fondo="transparent")
+        frame_recibo_container.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        
+        # --- 3. CONTENEDOR INFERIOR FIJO ---
+        frame_inferior = nuevo_frame(frame_derecho, color_fondo="transparent")
+        frame_inferior.grid(row=2, column=0, sticky="ew", pady=(0, 10))
+        
+        # --- BÚSQUEDA Y AGREGAR AL CARRITO ---
         self.entry_buscar_prod = nueva_caja_texto(frame_busqueda, placeholder="Código de Barras o Nombre...")
         self.entry_buscar_prod.pack(side="left", fill="x", expand=True, padx=(0, 10))
         self.entry_buscar_prod.bind("<Return>", self.agregar_al_carrito)
@@ -128,66 +141,67 @@ class VistaCaja(ConfiguracionComponentes):
         self.btn_agregar.pack(side="right")
 
         # --- TEXTO Y BOTONES PANEL DERECHO ---
-        self.lbl_texto_total = nuevo_label(frame_totales, "Total:", fuente=FUENTE_TITULOS)
-        self.lbl_texto_total.pack(pady=(15, 0))
+        self.lbl_texto_total = nuevo_label(frame_acciones, "Total:", fuente=FUENTE_TITULOS)
+        self.lbl_texto_total.pack(pady=(10, 0))
         
-        self.lbl_valor_total = nuevo_label(frame_totales, "$0", fuente=("Arial", 30, "bold"), color_texto=COLOR_EXITO)
-        self.lbl_valor_total.pack(pady=(0, 15))
+        self.lbl_valor_total = nuevo_label(frame_acciones, "$0", fuente=("Arial", 30, "bold"), color_texto=COLOR_EXITO)
+        self.lbl_valor_total.pack(pady=(0, 10))
 
         self.btn_abrir_cobro = nuevo_boton(
-            frame_totales, 
+            frame_acciones, 
             "Cobrar Venta (F12)", 
             comando=self.abrir_modal_cobro,
             color_fondo=COLOR_EXITO,
             color_hover=COLOR_EXITO_HOVER
         )
-        self.btn_abrir_cobro.pack(fill="x", padx=20, pady=5, ipady=5)
+        self.btn_abrir_cobro.pack(fill="x", padx=15, pady=3, ipady=3)
         self.winfo_toplevel().bind("<F12>", lambda event: self.abrir_modal_cobro())
 
         self.btn_guardar = nuevo_boton(
-            frame_totales, 
+            frame_acciones, 
             "Guardar Venta (F11)", 
             comando=self.abrir_modal_espera,
             color_fondo="#d4ac0d", 
             color_hover="#b9770e"
         )
-        self.btn_guardar.pack(fill="x", padx=20, pady=5, ipady=5)
+        self.btn_guardar.pack(fill="x", padx=15, pady=3, ipady=3)
         self.winfo_toplevel().bind("<F11>", lambda event: self.abrir_modal_espera())
         
         self.btn_ver_guardadas = nuevo_boton(
-            frame_totales, 
+            frame_acciones, 
             "Ver Ventas Guardadas", 
             comando=self.abrir_modal_ver_guardadas,
             color_fondo="#db4e17", 
             color_hover="#922F10"
         )
-        self.btn_ver_guardadas.pack(fill="x", padx=20, pady=5, ipady=5)
+        self.btn_ver_guardadas.pack(fill="x", padx=15, pady=3, ipady=3)
 
         self.btn_gastos = nuevo_boton(
-            frame_totales, 
+            frame_acciones, 
             "Registrar Gasto Rápido", 
             comando=self.abrir_modal_gastos,
             color_fondo="#5e17eb", 
             color_hover="#4a11c0"
         )
-        self.btn_gastos.pack(fill="x", padx=20, pady=5, ipady=5)
+        self.btn_gastos.pack(fill="x", padx=15, pady=3, ipady=3)
 
+        # --- BOTÓN CERRAR CAJA ---
         self.btn_cerrar_caja = nuevo_boton(
-            frame_derecho, 
+            frame_inferior, 
             "Cerrar Caja", 
             comando=self.confirmar_cierre_caja,
             color_fondo=COLOR_FALLO,
             color_hover=COLOR_FALLO_HOVER
         )
-        self.btn_cerrar_caja.pack(fill="x", padx=20, pady=5, ipady=5)
+        self.btn_cerrar_caja.pack(fill="x", padx=15, pady=5, ipady=5)
         
-        # --- INICIALIZACION CARRITO ---
+        # --- INICIALIZACIÓN CARRITO ---
         self.gestor_carrito = GestorCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
         self.gestor_carrito.btn_ver_guardadas = self.btn_ver_guardadas
         self.gestor_carrito.actualizar_ui()
         
-        # --- INICIALIZACION GESTOR DEL MINI RECIBO ---
-        self.gestor_recibo = GestorRecibo(frame_totales)
+        # --- INICIALIZACIÓN GESTOR DEL MINI RECIBO ---
+        self.gestor_recibo = GestorRecibo(frame_recibo_container)
 
     # --- POP-UP COBRO ---
     def abrir_modal_cobro(self):

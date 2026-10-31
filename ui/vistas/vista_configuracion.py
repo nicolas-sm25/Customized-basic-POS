@@ -3,6 +3,7 @@ from ui.componentes.configuracion_componentes import ConfiguracionComponentes
 from ui.componentes.creador_componentes import *
 from dal.conexion_DB import SessionLocal
 from dal.modelos.usuarios import Usuario
+from ui.modales.modal_usuarios import ModalUsuarios
 
 class VistaConfiguracion(ConfiguracionComponentes):
     def __init__(self, master, callback_cerrar_sesion):
@@ -41,50 +42,50 @@ class VistaConfiguracion(ConfiguracionComponentes):
         self.combo_tema.set(ctk.get_appearance_mode())
 
         # --- SECCIÓN: CREAR USUARIO NUEVO ---
-        nuevo_label(f_contenido, "Gestión de Usuarios (Crear Nuevo)", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(25, 10))
-        
+        rol_usuario = self.winfo_toplevel().usuario_actual['rol']
+
+        nuevo_label(f_contenido, "Gestión de Usuarios", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(25, 10))
         f_crear = nuevo_frame(f_contenido, color_fondo="#2b2b2b")
         f_crear.pack(fill="x", pady=5, padx=5)
 
-        f_form = nuevo_frame(f_crear, color_fondo="transparent")
-        f_form.pack(fill="x", padx=15, pady=15)
+        if rol_usuario == "Administrador":
 
-        self.entry_nombre = nueva_caja_texto(f_form, placeholder="Nombre completo")
-        self.entry_nombre.pack(fill="x", pady=5)
+            f_form_container = nuevo_frame(f_crear, color_fondo="transparent")
+            f_form_container.pack(fill="x", padx=15, pady=15)
 
-        self.entry_username = nueva_caja_texto(f_form, placeholder="Usuario (Login)")
-        self.entry_username.pack(fill="x", pady=5)
+            f_form = nuevo_frame(f_form_container, color_fondo="transparent", ancho=350)
+            f_form.pack(expand=True, pady=10)
 
-        self.entry_password = nueva_caja_texto(f_form, placeholder="Contraseña")
-        self.entry_password.configure(show="*")
-        self.entry_password.pack(fill="x", pady=5)
+            self.entry_nombre = nueva_caja_texto(f_form, placeholder="Nombre completo")
+            self.entry_nombre.configure(width=350, justify="left")
+            self.entry_nombre.pack(pady=5)
+            
+            self.entry_username = nueva_caja_texto(f_form, placeholder="Usuario (Login)")
+            self.entry_username.configure(width=350,justify="left")
+            self.entry_username.pack(pady=5)
+            
+            self.entry_password = nueva_caja_texto(f_form, placeholder="Contraseña")
+            self.entry_password.configure(show="*", width=350, justify="left")
+            self.entry_password.pack(pady=5)
 
-        # Menú desplegable para el Rol
-        f_rol = nuevo_frame(f_form, color_fondo="transparent")
-        f_rol.pack(fill="x", pady=5)
-        nuevo_label(f_rol, "Rol del usuario:", fuente=("Arial", 12), poscicion="w").pack(side="left")
-        
-        self.combo_rol = ctk.CTkOptionMenu(
-            f_rol,
-            values=["Vendedor", "Administrador"],
-            fg_color="#3b3b3b",
-            button_color="#4b4b4b",
-            button_hover_color="#5b5b5b",
-            width=140
-        )
-        self.combo_rol.pack(side="right")
-        self.combo_rol.set("Vendedor")
+            f_rol = nuevo_frame(f_form, color_fondo="transparent")
+            f_rol.pack(fill="x", pady=5)
+            nuevo_label(f_rol, "Rol del usuario:", fuente=("Arial", 12), poscicion="w").pack(side="left")
+            
+            self.combo_rol = ctk.CTkOptionMenu(f_rol, values=["Vendedor", "Administrador"], fg_color="#3b3b3b", button_color="#4b4b4b", button_hover_color="#5b5b5b", width=140)
+            self.combo_rol.pack(side="right")
+            self.combo_rol.set("Vendedor")
 
-        self.lbl_mensaje_usuario = nuevo_label(f_form, "", color_texto=COLOR_EXITO)
-        self.lbl_mensaje_usuario.pack(pady=5)
+            self.lbl_mensaje_usuario = nuevo_label(f_form, "", color_texto=COLOR_EXITO)
+            self.lbl_mensaje_usuario.pack(pady=5)
 
-        nuevo_boton(
-            f_form,
-            "Registrar Usuario",
-            comando=self.registrar_usuario_desde_ui,
-            color_fondo=COLOR_EXITO,
-            color_hover=COLOR_EXITO_HOVER
-        ).pack(fill="x", ipady=5, pady=(5, 0))
+            f_botones = nuevo_frame(f_form, color_fondo="transparent")
+            f_botones.pack(fill="x", pady=(5, 0))
+            
+            nuevo_boton(f_botones, "Registrar Nuevo", comando=self.registrar_usuario_desde_ui, color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER).pack(side="left", fill="x", expand=True, padx=2)
+            nuevo_boton(f_botones, "Ver Usuarios Registrados", comando=lambda: ModalUsuarios(self), color_fondo="#3498db", color_hover="#2980b9").pack(side="right", fill="x", expand=True, padx=2)
+        else:
+            nuevo_label(f_crear, "🔒 Acceso restringido.\nSolo los administradores pueden crear o ver usuarios.", fuente=("Arial", 13), color_texto=COLOR_FALLO).pack(pady=30)
 
         # --- SECCIÓN: CUENTA Y SESIÓN ---
         nuevo_label(f_contenido, "Control de Sesión", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(25, 10))

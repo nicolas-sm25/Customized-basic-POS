@@ -33,4 +33,26 @@ def inicializar_usuario_admin():
             sesion.commit()
     finally:
         sesion.close()
-        
+
+def obtener_usuarios():
+    sesion = SessionLocal()
+    try:
+        usuarios = sesion.query(Usuario).all()
+        # Excluimos la contraseña por seguridad al enviarlo a la vista
+        return [{"id": u.id, "nombre": u.nombre, "username": u.username, "rol": u.rol, "activo": u.activo} for u in usuarios]
+    finally:
+        sesion.close()
+
+def cambiar_estado_usuario(usuario_id, estado_nuevo):
+    sesion = SessionLocal()
+    try:
+        user = sesion.query(Usuario).filter(Usuario.id == usuario_id).first()
+        if user:
+            if user.username == "admin" and not estado_nuevo:
+                return False, "Por seguridad, no se puede deshabilitar al admin principal."
+            user.activo = estado_nuevo
+            sesion.commit()
+            return True, "Estado de usuario actualizado."
+        return False, "Usuario no encontrado."
+    finally:
+        sesion.close()

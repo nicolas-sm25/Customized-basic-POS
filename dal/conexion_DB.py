@@ -1,28 +1,30 @@
 import os
+import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
 from dal.modelos.base import Base
-from dal.modelos.productos import Producto
-from dal.modelos.ventas import Venta, DetalleVenta
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CARPETA_BD = os.path.join(BASE_DIR, "datos")
+# --- DETECCIÓN DE RUTA ABSOLUTA ---
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-if not os.path.exists(CARPETA_BD):
-    os.makedirs(CARPETA_BD)
+# Ruta hacia 'datos'
+CARPETA_DATOS = os.path.join(BASE_DIR, "datos")
 
-ruta_db = os.path.join(CARPETA_BD, "productos_DB.db")
+# Carpeta exista junto al .exe o al script
+if not os.path.exists(CARPETA_DATOS):
+    os.makedirs(CARPETA_DATOS)
 
-db_url = f"sqlite:///{ruta_db.replace(chr(92), '/')}"
+# Ruta absoluta del archivo de la base de datos
+RUTA_DB = os.path.join(CARPETA_DATOS, "productos_DB.db")
 
-engine = create_engine(
-    db_url, 
-    connect_args={'check_same_thread': False}
-)
+# Conexión a SQLite
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{RUTA_DB}"
 
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def inicializar_base_datos():
     Base.metadata.create_all(bind=engine)
-    print(f"Base de datos asegurada en: {ruta_db}")

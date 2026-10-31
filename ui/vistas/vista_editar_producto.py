@@ -92,26 +92,37 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.nombre_actual = None
         self.codigo_actual = None
         
-    # --- MOSTRAR RESULTADOS DE LA BUSQUEDA EN PANTALLA ---    
+    # --- MOSTRAR RESULTADOS Y APLICAR RESTRICCIONES POR ROL ---    
     def cargar_datos_en_pantalla(self, producto):
-            self.limpiar_campos()
-            
-            self.lbl_valor_nombre.configure(text=producto["nombre"])
-            self.lbl_valor_codigo.configure(text=producto["codigo_barras"] if producto["codigo_barras"] else "N/A")
-            
-            self.habilitar(self.entradas_editables)
-            self.entry_costo.insert(0, str(int(producto["costo"])))
-            self.entry_precio.insert(0, str(int(producto["precio_venta"])))
-            self.entry_stock.insert(0, str(producto["stock"]))
+        self.limpiar_campos()
+        self.stock_actual = producto["stock"] 
+        
+        self.lbl_valor_nombre.configure(text=producto["nombre"])
+        self.lbl_valor_codigo.configure(text=producto["codigo_barras"] if producto["codigo_barras"] else "N/A")
+
+        self.habilitar(self.entradas_editables)
+
+        self.entry_costo.insert(0, str(int(producto["costo"])))
+        self.entry_precio.insert(0, str(int(producto["precio_venta"])))
+        self.entry_stock.insert(0, str(producto["stock"]))
+
+        rol_usuario = self.winfo_toplevel().usuario_actual['rol']
+        if rol_usuario == "Vendedor":
+            self.entry_costo.configure(state="disabled")
+            self.entry_precio.configure(state="disabled")
+
+    def buscar_externamente(self, criterio):
+        """Llamado desde el inventario para auto-buscar el producto."""
+        self.entry_busqueda.delete(0, 'end')
+        self.entry_busqueda.insert(0, criterio)
+        self.buscar_producto()
 
     # --- BÚSQUEDA DE PRODUCTOS EN LA DB ---
     def buscar_producto(self, event=None):
         criterio = self.entry_busqueda.get().strip()
         if not criterio:
             return
-
         producto = buscar_producto_por_codigo(criterio)
-
         if not producto:
             resultados = buscar_productos_por_nombre(criterio)
             if resultados:
@@ -121,17 +132,17 @@ class VistaEditarProducto(ConfiguracionComponentes):
             self.producto_id_actual = producto["id"]
             self.nombre_actual = producto["nombre"]
             self.codigo_actual = producto["codigo_barras"]
-            
             self.deshabilitar(self.elementos_busqueda)
-            self.cargar_datos_en_pantalla(producto)
-            self.habilitar(self.entradas_editables, self.botones_accion)
             
-            self.lbl_mensaje.configure(text="Producto cargado. Ya puede editar costos y stock.", text_color=COLOR_EXITO)
-            self.entry_costo.focus()
+            self.cargar_datos_en_pantalla(producto)
+            self.habilitar(self.botones_accion)
+            
+            self.lbl_mensaje.configure(text="Producto cargado.", text_color=COLOR_EXITO)
+            self.entry_stock.focus()
         else:
-            self.reiniciar_pantalla(mensaje="No se encontró ningún producto.", color=COLOR_FALLO)
+            self.reiniciar_pantalla("No se encontró ningún producto.", COLOR_FALLO)
 
-    # --- GUARDAR NUEVA INFO EN LA DB ---
+    # --- GUARDAR NUEVA INFO EN LA DB (CON VALIDACIÓN DE ROL) ---
     def guardar_cambios(self, event=None):
         if not self.producto_id_actual:
             return
@@ -140,30 +151,24 @@ class VistaEditarProducto(ConfiguracionComponentes):
         precio_str = self.entry_precio.get().replace(".", "").strip()
         stock_str = self.entry_stock.get().replace(".", "").strip()
 
-        if not costo_str or not precio_str:
-            self.lbl_mensaje.configure(text="El costo y el precio son obligatorios.", text_color=COLOR_FALLO)
-            return
-
         try:
-            costo = float(costo_str)
-            precio = float(precio_str)
+            costo = float(costo_str) if costo_str else 0
+            precio = float(precio_str) if precio_str else 0
             stock = int(stock_str) if stock_str else 0
 
-            if costo < 0 or precio < 0 or stock < 0:
-                self.lbl_mensaje.configure(text="No se admiten valores negativos.", text_color=COLOR_FALLO)
-                return
+            rol_usuario = self.winfo_toplevel().usuario_actual['rol']
+
+            if rol_usuario == "Vendedor":
+                if stock < self.stock_actual:
+                    self.lbl_mensaje.configure(text="Los vendedores solo pueden registrar entradas (aumentar stock).", text_color=COLOR_FALLO)
+                    return
 
             exito, mensaje = actualizar_producto(
-                self.producto_id_actual, 
-                self.nombre_actual, 
-                costo, 
-                precio, 
-                self.codigo_actual, 
-                stock
+                self.producto_id_actual, self.nombre_actual, costo, precio, self.codigo_actual, stock
             )
 
             if exito:
-                self.reiniciar_pantalla(mensaje="Cambios guardados exitosamente.", color=COLOR_EXITO)
+                self.reiniciar_pantalla("Cambios guardados exitosamente.", COLOR_EXITO)
             else:
                 self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 
