@@ -1,10 +1,16 @@
-from bll.gestor_ventas import registrar_venta
+# Gestores (lógica)
+from bll.gestor_ventas import registrar_venta, obtener_ventas_pendientes, eliminar_venta_pendiente
 from bll.gestor_productos import buscar_producto_por_codigo, buscar_productos_por_nombre
 from bll.gestor_caja import *
+# Componentes
 from ui.componentes.configuracion_componentes import *
 from ui.componentes.creador_componentes import *
+# Modales/Pop-ups
 from ui.modales.modal_cobro import ModalCobro
 from ui.modales.modal_cierre import ModalCierre
+from ui.modales.modal_guardar import ModalGuardar
+from ui.modales.modal_ventas_guardadas import ModalVentasGuardadas
+# Gestores (vista)
 from ui.vistas.secciones.gestor_carrito import GestorCarrito
 
 # --- CREACION VISTA CAJA ---
@@ -117,10 +123,6 @@ class VistaCaja(ConfiguracionComponentes):
         self.btn_agregar = nuevo_boton(frame_busqueda, "Agregar", self.agregar_al_carrito)
         self.btn_agregar.pack(side="right")
 
-        # --- INFO DEL CARRITO (TEMPORAL) ---
-        lbl_carrito = nuevo_label(self.frame_carrito, "El carrito está vacío", fuente=FUENTE_NEGRITA)
-        lbl_carrito.pack(expand=True)
-
         # --- TEXTO Y BOTONES PANEL DERECHO ---
         self.lbl_texto_total = nuevo_label(frame_totales, "Total:", fuente=FUENTE_TITULOS)
         self.lbl_texto_total.pack(pady=(40, 0))
@@ -128,10 +130,6 @@ class VistaCaja(ConfiguracionComponentes):
         self.lbl_valor_total = nuevo_label(frame_totales, "$0", fuente=("Arial", 30, "bold"), color_texto=COLOR_EXITO)
         self.lbl_valor_total.pack(pady=(0, 40))
 
-        # --- INICIALIZACION CARRITO ---
-        self.gestor_carrito = GestorCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
-        self.gestor_carrito.actualizar_ui()
-        
         self.btn_abrir_cobro = nuevo_boton(
             frame_totales, 
             "Cobrar Venta (F12)", 
@@ -141,15 +139,39 @@ class VistaCaja(ConfiguracionComponentes):
         )
         self.btn_abrir_cobro.pack(pady=10)
         self.winfo_toplevel().bind("<F12>", lambda event: self.abrir_modal_cobro())
+
+        self.btn_guardar = nuevo_boton(
+            frame_totales, 
+            "Guardar Venta (F11)", 
+            comando=self.abrir_modal_espera,
+            color_fondo="#d4ac0d", 
+            color_hover="#b9770e"
+        )
+        self.btn_guardar.pack(pady=5)
+        self.winfo_toplevel().bind("<F11>", lambda event: self.abrir_modal_espera())
         
+        self.btn_ver_guardadas = nuevo_boton(
+            frame_totales, 
+            "Ver Ventas Guardadas", 
+            comando=self.abrir_modal_ver_guardadas,
+            color_fondo="#db4e17", 
+            color_hover="#922F10"
+        )
+        self.btn_ver_guardadas.pack(pady=5)
+
         self.btn_cerrar_caja = nuevo_boton(
             frame_derecho, 
-            "Cerrar caja", 
+            "Cerrar Caja", 
             comando=self.confirmar_cierre_caja,
             color_fondo=COLOR_FALLO,
             color_hover=COLOR_FALLO_HOVER
         )
         self.btn_cerrar_caja.pack(pady=20, padx=20, anchor="se")
+        
+        # --- INICIALIZACION CARRITO ---
+        self.gestor_carrito = GestorCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
+        self.gestor_carrito.btn_ver_guardadas = self.btn_ver_guardadas
+        self.gestor_carrito.actualizar_ui()
 
     # --- POP-UP COBRO ---
     def abrir_modal_cobro(self):
@@ -162,6 +184,62 @@ class VistaCaja(ConfiguracionComponentes):
         
         total_actual = self.lbl_valor_total.cget("text")
         ModalCobro(self, total_actual, self.procesar_cobro)
+
+    # --- POP-UP GUARDAR ---
+    def abrir_modal_espera(self):
+        """Abre el modal personalizado para guardar ventas fiadas."""
+        if not hasattr(self, 'gestor_carrito') or not self.gestor_carrito.items:
+            self.lbl_valor_total.configure(text="¡Vacío!", text_color=COLOR_FALLO)
+            self.after(1500, lambda: self.lbl_valor_total.configure(text="$0", text_color=COLOR_EXITO))
+            return
+        
+        ModalGuardar(self, self.procesar_espera)
+
+    def procesar_espera(self, referencia, modal_referencia):
+        """Envía los datos al BLL y muestra el éxito en la UI."""
+        exito, mensaje = registrar_venta(
+            carrito=self.gestor_carrito.items,
+            metodo_pago="Pendiente",
+            caja_id=self.caja_activa_id,
+            nombre_cliente=referencia,
+            pagado=False
+        )
+
+        if exito:
+            self.gestor_carrito.vaciar()
+            modal_referencia.destroy()
+            
+            # --- MENSAJE DE ÉXITO ---
+            self.entry_buscar_prod.delete(0, 'end')
+            self.entry_buscar_prod.configure(placeholder_text=f"¡Guardado!, referencia: {referencia}!", placeholder_text_color=COLOR_EXITO)
+
+            self.after(1500, lambda: [
+                self.focus(), 
+                self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
+                self.entry_buscar_prod.focus()
+            ])
+        else:
+            modal_referencia.lbl_error.configure(text=mensaje)
+
+    # --- POP-UP VER GUARDADAS ---
+    def abrir_modal_ver_guardadas(self):
+        """Consulta la DB y abre el modal con las ventas guardadas."""
+        ventas_pendientes = obtener_ventas_pendientes()
+        ModalVentasGuardadas(self, ventas_pendientes, self.recuperar_venta)
+
+    def recuperar_venta(self, venta):
+        """Carga los items al carrito y elimina el PENDIENTE de la base de datos."""
+        self.gestor_carrito.cargar_items(venta["items"])
+        
+        eliminar_venta_pendiente(venta["id"])
+        
+        self.entry_buscar_prod.delete(0, 'end')
+        self.entry_buscar_prod.configure(placeholder_text=f"¡{venta['cliente']} recuperado!", placeholder_text_color=COLOR_EXITO)
+        self.after(1500, lambda: [
+            self.master.focus(), 
+            self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
+            self.entry_buscar_prod.focus()
+        ])
     
     # --- POP-UP CIERRE DE CAJA ---    
     def confirmar_cierre_caja(self):
@@ -195,8 +273,13 @@ class VistaCaja(ConfiguracionComponentes):
             self.entry_buscar_prod.delete(0, 'end')
         else:
             self.entry_buscar_prod.delete(0, 'end')
+            self.focus()
             self.entry_buscar_prod.configure(placeholder_text="¡Producto no encontrado!", placeholder_text_color=COLOR_FALLO)
-            self.after(1000, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), self.entry_buscar_prod.focus()])
+            self.after(1000, lambda: [
+                self.master.focus(), 
+                self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
+                self.entry_buscar_prod.focus()
+            ])
 
     def procesar_cobro(self, metodo_pago, modal_referencia):
         """Envía los items guardados en el gestor al BLL."""
@@ -218,3 +301,13 @@ class VistaCaja(ConfiguracionComponentes):
             print("¡Venta Exitosa!")
         else:
             print(mensaje)
+
+    # --- DESHABILITADOR DE ATAJOS ---
+    def destroy(self):
+        """Se ejecuta al cambiar de vista. Limpia los atajos de teclado globales."""
+        try:
+            self.winfo_toplevel().unbind("<F12>")
+            self.winfo_toplevel().unbind("<F11>")
+        except Exception:
+            pass
+        super().destroy()

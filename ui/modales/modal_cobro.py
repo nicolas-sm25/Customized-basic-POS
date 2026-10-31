@@ -24,7 +24,7 @@ class ModalCobro(ctk.CTkToplevel):
         frame_botones.pack(pady=10)
 
         # Botones que llaman la vista principal
-        btn_efectivo = nuevo_boton(frame_botones, "Efectivo (Enter)", comando=lambda: callback_procesar("Efectivo", self), color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER)
+        btn_efectivo = nuevo_boton(frame_botones, "Efectivo (Enter/F12)", comando=lambda: callback_procesar("Efectivo", self), color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER)
         btn_efectivo.grid(row=0, column=0, padx=10)
 
         btn_nequi = nuevo_boton(frame_botones, "Nequi", comando=lambda: callback_procesar("Nequi", self), color_fondo="#5e17eb", color_hover="#4a11c0")
@@ -36,3 +36,4 @@ class ModalCobro(ctk.CTkToplevel):
         # Atajos de teclado
         self.bind("<Escape>", lambda event: self.destroy())
         self.bind("<Return>", lambda event: callback_procesar("Efectivo", self))
+        self.bind("<F12>", lambda event: callback_procesar("Efectivo", self))

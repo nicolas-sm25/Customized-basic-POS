@@ -12,7 +12,7 @@ class GestorCarrito:
     def agregar_producto(self, producto):
         """Añade un producto a la lista o suma 1 si ya existe."""
         for item in self.items:
-            if item["id"] == producto["id"]:
+            if item["id"] == producto["id"] and not item.get("recuperado"):
                 item["cantidad"] += 1
                 item["subtotal"] = item["cantidad"] * item["precio_venta"]
                 break
@@ -31,6 +31,12 @@ class GestorCarrito:
         """Redibuja la lista de productos y actualiza el label del total."""
         for widget in self.frame_carrito.winfo_children():
             widget.destroy()
+
+        if hasattr(self, 'btn_ver_guardadas') and self.btn_ver_guardadas:
+            if self.items:
+                self.btn_ver_guardadas.configure(state="disabled")
+            else:
+                self.btn_ver_guardadas.configure(state="normal")
 
         if not self.items:
             lbl_vacio = nuevo_label(self.frame_carrito, "El carrito está vacío", fuente=FUENTE_NEGRITA)
@@ -60,20 +66,24 @@ class GestorCarrito:
             frame_controles = nuevo_frame(frame_item, color_fondo="transparent")
             frame_controles.grid(row=0, column=3, sticky="e", padx=5, pady=5)
 
-            btn_eliminar = nuevo_boton(frame_controles, "X", comando=lambda i=index: self.eliminar_item(i), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER, ancho=30)
-            btn_eliminar.pack(side="right", padx=(10, 0))
+            if item.get("recuperado"):
+                lbl_bloqueado = nuevo_label(frame_controles, "(Recuperado)", color_texto="#d4ac0d", fuente=FUENTE_NEGRITA)
+                lbl_bloqueado.pack(side="right", padx=10)
+            else:
+                btn_eliminar = nuevo_boton(frame_controles, "X", comando=lambda i=index: self.eliminar_item(i), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER, ancho=30)
+                btn_eliminar.pack(side="right", padx=(10, 0))
 
-            btn_mas = nuevo_boton(frame_controles, "+", comando=lambda i=index: self.cambiar_cantidad(i, 1), ancho=30)
-            btn_mas.pack(side="right", padx=2)
+                btn_mas = nuevo_boton(frame_controles, "+", comando=lambda i=index: self.cambiar_cantidad(i, 1), ancho=30)
+                btn_mas.pack(side="right", padx=2)
 
-            entry_cant = nueva_caja_texto(frame_controles)
-            entry_cant.configure(width=50)
-            entry_cant.insert(0, str(item['cantidad']))
-            entry_cant.pack(side="right", padx=2)
-            entry_cant.bind("<Return>", lambda event, i=index, e=entry_cant: self.actualizar_manual(e, i))
+                entry_cant = nueva_caja_texto(frame_controles)
+                entry_cant.configure(width=50)
+                entry_cant.insert(0, str(item['cantidad']))
+                entry_cant.pack(side="right", padx=2)
+                entry_cant.bind("<Return>", lambda event, i=index, e=entry_cant: self.actualizar_manual(e, i))
 
-            btn_menos = nuevo_boton(frame_controles, "-", comando=lambda i=index: self.cambiar_cantidad(i, -1), ancho=30)
-            btn_menos.pack(side="right", padx=2)
+                btn_menos = nuevo_boton(frame_controles, "-", comando=lambda i=index: self.cambiar_cantidad(i, -1), ancho=30)
+                btn_menos.pack(side="right", padx=2)
 
             total_venta += item["subtotal"]
 
@@ -105,4 +115,12 @@ class GestorCarrito:
     def vaciar(self):
         """Limpia el carrito completamente después de una venta."""
         self.items.clear()
+        self.actualizar_ui()
+
+    def cargar_items(self, lista_items):
+        """Reemplaza el carrito actual con una lista recuperada de la base de datos."""
+        for item in lista_items:
+            item["recuperado"] = True
+
+        self.items = lista_items
         self.actualizar_ui()
