@@ -126,10 +126,10 @@ class VistaCaja(ConfiguracionComponentes):
 
         # --- TEXTO Y BOTONES PANEL DERECHO ---
         self.lbl_texto_total = nuevo_label(frame_totales, "Total:", fuente=FUENTE_TITULOS)
-        self.lbl_texto_total.pack(pady=(40, 0))
+        self.lbl_texto_total.pack(pady=(15, 0))
         
         self.lbl_valor_total = nuevo_label(frame_totales, "$0", fuente=("Arial", 30, "bold"), color_texto=COLOR_EXITO)
-        self.lbl_valor_total.pack(pady=(0, 40))
+        self.lbl_valor_total.pack(pady=(0, 15))
 
         self.btn_abrir_cobro = nuevo_boton(
             frame_totales, 
@@ -138,7 +138,7 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo=COLOR_EXITO,
             color_hover=COLOR_EXITO_HOVER
         )
-        self.btn_abrir_cobro.pack(fill="x", padx=20, pady=10, ipady=10)
+        self.btn_abrir_cobro.pack(fill="x", padx=20, pady=5, ipady=5)
         self.winfo_toplevel().bind("<F12>", lambda event: self.abrir_modal_cobro())
 
         self.btn_guardar = nuevo_boton(
@@ -148,7 +148,7 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo="#d4ac0d", 
             color_hover="#b9770e"
         )
-        self.btn_guardar.pack(fill="x", padx=20, pady=10, ipady=10)
+        self.btn_guardar.pack(fill="x", padx=20, pady=5, ipady=5)
         self.winfo_toplevel().bind("<F11>", lambda event: self.abrir_modal_espera())
         
         self.btn_ver_guardadas = nuevo_boton(
@@ -158,7 +158,16 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo="#db4e17", 
             color_hover="#922F10"
         )
-        self.btn_ver_guardadas.pack(fill="x", padx=20, pady=10, ipady=10)
+        self.btn_ver_guardadas.pack(fill="x", padx=20, pady=5, ipady=5)
+
+        self.btn_gastos = nuevo_boton(
+            frame_totales, 
+            "Registrar Gasto Rápido", 
+            comando=self.abrir_modal_gastos,
+            color_fondo="#5e17eb", 
+            color_hover="#4a11c0"
+        )
+        self.btn_gastos.pack(fill="x", padx=20, pady=5, ipady=5)
 
         self.btn_cerrar_caja = nuevo_boton(
             frame_derecho, 
@@ -167,7 +176,7 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo=COLOR_FALLO,
             color_hover=COLOR_FALLO_HOVER
         )
-        self.btn_cerrar_caja.pack(fill="x", padx=20, pady=10, ipady=10)
+        self.btn_cerrar_caja.pack(fill="x", padx=20, pady=5, ipady=5)
         
         # --- INICIALIZACION CARRITO ---
         self.gestor_carrito = GestorCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
@@ -211,7 +220,7 @@ class VistaCaja(ConfiguracionComponentes):
 
         if exito:
             self.gestor_carrito.vaciar()
-            modal_referencia.destroy()
+            modal_referencia.cerrar_modal()
             
             # --- MENSAJE DE ÉXITO ---
             self.entry_buscar_prod.delete(0, 'end')
@@ -225,36 +234,59 @@ class VistaCaja(ConfiguracionComponentes):
         else:
             modal_referencia.lbl_error.configure(text=mensaje)
 
-    # --- POP-UP VER GUARDADAS ---
+    # --- POP-UP GASTOS ---
+    def abrir_modal_gastos(self):
+        from ui.modales.modal_gasto import ModalGasto
+        ModalGasto(self, self.caja_activa_id, self.confirmar_gasto)
+        
+    def confirmar_gasto(self, exito, mensaje):
+        if exito:
+            self.entry_buscar_prod.configure(placeholder_text="¡Gasto registrado en caja!", placeholder_text_color=COLOR_EXITO)
+        else:
+            self.entry_buscar_prod.configure(placeholder_text="Error al registrar gasto", placeholder_text_color=COLOR_FALLO)
+        self.after(2000, lambda: self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"))
+
+    # --- POP-UP PEDIDOS GUARDADOS ---
     def abrir_modal_ver_guardadas(self):
-        """Consulta la DB y abre el modal con las ventas guardadas."""
+        from ui.modales.modal_ventas_guardadas import ModalVentasGuardadas
         ventas_pendientes = obtener_ventas_pendientes()
-        ModalVentasGuardadas(self, ventas_pendientes, self.recuperar_venta)
+        ModalVentasGuardadas(self, ventas_pendientes, self.recuperar_venta, self.eliminar_venta_guardada)
 
     def recuperar_venta(self, venta):
-        """Carga los items al carrito y elimina el PENDIENTE de la base de datos."""
         self.gestor_carrito.cargar_items(venta["items"])
-
         self.cliente_actual = venta["cliente"]
-
         eliminar_venta_pendiente(venta["id"])
-
+        
         self.entry_buscar_prod.delete(0, 'end')
         self.entry_buscar_prod.configure(placeholder_text=f"¡Pedido de {venta['cliente']} recuperado!", placeholder_text_color=COLOR_EXITO)
+        
         self.after(1500, lambda: [
-            self.master.focus(), 
+            self.focus(), 
             self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
             self.entry_buscar_prod.focus()
         ])
-    
-    # --- POP-UP CIERRE DE CAJA ---    
+
+    def eliminar_venta_guardada(self, venta_id):
+        exito = eliminar_venta_pendiente(venta_id)
+        if exito:
+            self.entry_buscar_prod.configure(placeholder_text="¡Pedido eliminado!", placeholder_text_color=COLOR_EXITO)
+        else:
+            self.entry_buscar_prod.configure(placeholder_text="Error al eliminar", placeholder_text_color=COLOR_FALLO)
+        
+        self.after(1500, lambda: [
+            self.focus(), 
+            self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
+            self.entry_buscar_prod.focus()
+        ])
+
+    # --- POP-UP CIERRE CAJA ---
     def confirmar_cierre_caja(self):
-        ModalCierre(self, self.ejecutar_cierre)
+        from ui.modales.modal_cierre import ModalCierre
+        ModalCierre(self, self.caja_activa_id, self.ejecutar_cierre)
     
-    # Ejecutar cierre de caja
-    def ejecutar_cierre(self):
-        """Llama al BLL para cerrar la caja y devuelve al usuario a la pantalla de inicio."""
-        exito, mensaje = cerrar_caja()
+    def ejecutar_cierre(self, efectivo_fisico, diferencia):
+        from bll.gestor_caja import cerrar_caja_definitiva
+        exito, mensaje = cerrar_caja_definitiva(self.caja_activa_id, efectivo_fisico, diferencia)
         
         if exito:
             self.verificar_estado_caja()
@@ -316,7 +348,7 @@ class VistaCaja(ConfiguracionComponentes):
             )
 
             self.gestor_carrito.vaciar()
-            modal_referencia.destroy()
+            modal_referencia.cerrar_modal()
             
             if hasattr(self, 'cliente_actual'):
                 del self.cliente_actual

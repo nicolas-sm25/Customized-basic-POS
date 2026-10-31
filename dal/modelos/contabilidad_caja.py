@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, Float, DateTime
+from sqlalchemy import Boolean, Column, Integer, Float, DateTime, String, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from dal.modelos.base import Base
@@ -14,8 +14,24 @@ class ContabilidadCaja(Base):
     
     ventas_efectivo = Column(Float, default=0.0)
     ventas_nequi = Column(Float, default=0.0)
+    gastos_totales = Column(Float, default=0.0)
+    
+    costos_totales = Column(Float, default=0.0)
+    ganancia_total = Column(Float, default=0.0)
     
     total_efectivo_cierre = Column(Float, nullable=True)
     diferencia = Column(Float, nullable=True)
     
     ventas = relationship("Venta", back_populates="caja")
+    gastos = relationship("GastoCaja", back_populates="caja", cascade="all, delete-orphan")
+
+class GastoCaja(Base):
+    __tablename__ = 'gastos_caja'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    caja_id = Column(Integer, ForeignKey('contabilidad_caja.id'), nullable=False)
+    descripcion = Column(String, nullable=False)
+    monto = Column(Float, nullable=False)
+    fecha_hora = Column(DateTime, default=datetime.now)
+    
+    caja = relationship("ContabilidadCaja", back_populates="gastos")

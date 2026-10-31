@@ -80,7 +80,14 @@ class VistaInventario(ConfiguracionComponentes):
             nuevo_label(f_item, f"${int(prod['precio_venta']):,}".replace(",", "."), fuente=("Arial", 13, "bold"), color_texto="#448844" if not prod['activo'] else COLOR_EXITO).grid(row=0, column=2, sticky="e", pady=10)
             
             # Stock
-            nuevo_label(f_item, str(prod['stock']), fuente=("Arial", 14, "bold"), color_texto="#888888" if not prod['activo'] else "#ffffff", poscicion="center").grid(row=0, column=3, sticky="nsew", pady=10)
+            if prod['stock'] <= 5:
+                color_stock = COLOR_FALLO
+                texto_stock = f"{prod['stock']} ⚠️"
+            else:
+                color_stock = "#ffffff" if prod['activo'] else "#888888"
+                texto_stock = str(prod['stock'])
+                
+            nuevo_label(f_item, texto_stock, fuente=("Arial", 14, "bold"), color_texto=color_stock, poscicion="center").grid(row=0, column=3, sticky="nsew", pady=10)
             
             # Relación
             if prod['unidad_inactiva']:
