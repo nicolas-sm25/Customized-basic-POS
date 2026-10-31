@@ -46,8 +46,20 @@ def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente= None, pagado=
 
             if not item.get('recuperado'):
                 producto_db = sesion.query(Producto).filter(Producto.id == item['id']).first()
+                
                 if producto_db:
-                    producto_db.stock -= item['cantidad']
+                    if producto_db.es_paquete and producto_db.producto_base_id:
+                        producto_base = sesion.query(Producto).filter(Producto.id == producto_db.producto_base_id).first()
+                        if producto_base:
+                            producto_base.stock -= (item['cantidad'] * producto_db.cantidad_por_paquete)
+                            producto_db.stock = producto_base.stock // producto_db.cantidad_por_paquete
+
+                    else:
+                        producto_db.stock -= item['cantidad']
+
+                        paquetes_vinculados = sesion.query(Producto).filter(Producto.producto_base_id == producto_db.id).all()
+                        for paquete in paquetes_vinculados:
+                            paquete.stock = producto_db.stock // paquete.cantidad_por_paquete
 
         nueva_venta.total = total_venta
         nueva_venta.ganancia_total = ganancia_venta
@@ -74,7 +86,6 @@ def obtener_ventas_pendientes():
     sesion = SessionLocal()
 
     try:
-        # Filtro ventas no pagadas 
         ventas = sesion.query(Venta).filter(Venta.pagado == False).all()
         
         lista_ventas = []
