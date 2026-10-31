@@ -54,3 +54,22 @@ def nuevo_boton(master, texto, comando, fuente=FUENTE_NORMAL, color_fondo=None, 
         state = "normal", 
         width = ancho
     )
+
+
+def nuevo_modal(master, titulo, ancho, alto):
+    """Fábrica para crear ventanas secundarias (pop-ups) centradas y bloqueantes."""
+    modal = ctk.CTkToplevel(master)
+    modal.title(titulo)
+    
+    modal.update_idletasks()
+    ancho_pantalla = modal.winfo_screenwidth()
+    alto_pantalla = modal.winfo_screenheight()
+    x = (ancho_pantalla // 2) - (ancho // 2)
+    y = (alto_pantalla // 2) - (alto // 2)
+    
+    modal.geometry(f"{ancho}x{alto}+{x}+{y}")
+    
+    modal.transient(master.winfo_toplevel())
+    modal.grab_set()
+    
+    return modal
