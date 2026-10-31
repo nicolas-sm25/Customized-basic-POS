@@ -70,7 +70,7 @@ class VistaCaja(ConfiguracionComponentes):
     def ejecutar_apertura(self, event=None):
         base_str = self.entry_base.get().replace(".", "").strip()
         if not base_str:
-            self.lbl_mensaje.configure(text="Ingrese el efectivo actual en caja (Si no hay efectivo, ingrese 0)", text_color=COLOR_FALLO)
+            self.lbl_mensaje.configure(text="Ingrese el efectivo actual en caja", text_color=COLOR_FALLO)
             return
 
         try:
@@ -78,8 +78,11 @@ class VistaCaja(ConfiguracionComponentes):
             if base_efectivo < 0:
                 self.lbl_mensaje.configure(text="La base no puede ser negativa.", text_color=COLOR_FALLO)
                 return
+
+            ventana_ppal = self.winfo_toplevel()
+            usuario_id = getattr(ventana_ppal, 'usuario_actual', {}).get('id')
             
-            exito, mensaje = abrir_caja(base_efectivo)
+            exito, mensaje = abrir_caja(base_efectivo, usuario_id=usuario_id)
             
             if exito:
                 self.verificar_estado_caja()

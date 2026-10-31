@@ -7,6 +7,7 @@ class ContabilidadCaja(Base):
     __tablename__ = 'contabilidad_caja'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_id = Column(Integer, ForeignKey('usuarios.id'), nullable=True)
     fecha_apertura = Column(DateTime, default=datetime.now)
     fecha_cierre = Column(DateTime, nullable=True)
     base_efectivo = Column(Float, default=0.0)
@@ -24,6 +25,7 @@ class ContabilidadCaja(Base):
     
     ventas = relationship("Venta", back_populates="caja")
     gastos = relationship("GastoCaja", back_populates="caja", cascade="all, delete-orphan")
+    usuario = relationship("Usuario")
 
 class GastoCaja(Base):
     __tablename__ = 'gastos_caja'

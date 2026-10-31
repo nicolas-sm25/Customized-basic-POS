@@ -17,7 +17,7 @@ def obtener_caja_abierta():
     
 
 # --- INICIAR CAJA ---
-def abrir_caja(base_efectivo):
+def abrir_caja(base_efectivo, usuario_id = None):
     """Crea un nuevo registro de caja y lo marca como abierto."""
     
     sesion = SessionLocal()
@@ -28,7 +28,9 @@ def abrir_caja(base_efectivo):
             return False, "Ya existe una caja abierta. Debe cerrarla primero."
         
         nueva_caja = ContabilidadCaja(
-            base_efectivo=base_efectivo
+            base_efectivo=base_efectivo,
+            usuario_id=usuario_id,
+            abierta = True
         )
         sesion.add(nueva_caja)
         sesion.commit()
@@ -143,16 +145,18 @@ def cerrar_caja_definitiva(caja_id, efectivo_fisico, diferencia):
         sesion.close()
 
 def obtener_historial_cajas():
-    """Consulta la base de datos y formatea el historial de todas las cajas."""
     sesion = SessionLocal()
     try:
         cajas = sesion.query(ContabilidadCaja).order_by(ContabilidadCaja.id.desc()).all()
         resultado = []
         for c in cajas:
             ganancia_bruta = c.ganancia_total if c.ganancia_total else 0
+            nombre_encargado = c.usuario.nombre if c.usuario else "Desconocido"
+            
             resultado.append({
                 "id": c.id,
-                "fecha": c.fecha_apertura.strftime("%d/%m/%Y") if c.fecha_apertura else "N/A",
+                "encargado": nombre_encargado, # <- NUEVO
+                "fecha": c.fecha_apertura.strftime("%d/%m/%Y %H:%M") if c.fecha_apertura else "N/A",
                 "base": c.base_efectivo,
                 "ventas": c.ventas_efectivo + c.ventas_nequi,
                 "gastos": c.gastos_totales,
