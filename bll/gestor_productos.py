@@ -155,3 +155,86 @@ def obtener_productos_unitarios():
         return [{"id": p.id, "nombre": p.nombre} for p in productos]
     finally:
         sesion.close()
+
+
+def obtener_inventario_completo():
+    """Devuelve todos los productos (activos e inactivos) con información detallada de paquetes y estado de su unidad base."""
+    sesion = SessionLocal()
+    try:
+        productos = sesion.query(Producto).all()
+        resultado = []
+        for p in productos:
+            nombre_base = "N/A"
+            unidad_inactiva = False
+
+            if p.es_paquete and p.producto_base_id:
+                base = sesion.query(Producto).filter(Producto.id == p.producto_base_id).first()
+                if base:
+                    nombre_base = f"{base.nombre} (x{p.cantidad_por_paquete})"
+                    if not base.activo:
+                        unidad_inactiva = True
+                else:
+                    nombre_base = f"ID: {p.producto_base_id} (x{p.cantidad_por_paquete})"
+            elif p.es_paquete:
+                nombre_base = f"Paquete (x{p.cantidad_por_paquete})"
+
+            resultado.append({
+                "id": p.id,
+                "nombre": p.nombre,
+                "costo": p.costo,
+                "precio_venta": p.precio_venta,
+                "stock": p.stock,
+                "es_paquete": p.es_paquete,
+                "activo": p.activo,
+                "info_paquete": nombre_base,
+                "unidad_inactiva": unidad_inactiva
+            })
+        return resultado
+    finally:
+        sesion.close()
+
+def desactivar_producto_db(producto_id):
+    """Desactiva lógicamente el producto y aplica desactivación en cascada si es unidad base."""
+    sesion = SessionLocal()
+    try:
+        producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
+        if not producto:
+            return False, "Producto no encontrado."
+        
+        producto.activo = False
+
+        if not producto.es_paquete:
+            paquetes_vinculados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
+            for paquete in paquetes_vinculados:
+                paquete.activo = False
+
+        sesion.commit()
+        return True, f"Producto '{producto.nombre}' desactivado correctamente."
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error al desactivar: {str(e)}"
+    finally:
+        sesion.close()
+
+def reactivar_producto_db(producto_id):
+    """Reactiva lógicamente el producto y aplica activación en cascada si es unidad base."""
+    sesion = SessionLocal()
+    try:
+        producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
+        if not producto:
+            return False, "Producto no encontrado."
+        
+        producto.activo = True
+
+        if not producto.es_paquete:
+            paquetes_vinculados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
+            for paquete in paquetes_vinculados:
+                paquete.activo = True
+
+        sesion.commit()
+        return True, f"Producto '{producto.nombre}' reactivado correctamente."
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error al reactivar: {str(e)}"
+    finally:
+        sesion.close()

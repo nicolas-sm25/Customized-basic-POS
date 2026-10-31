@@ -4,6 +4,7 @@ from ui.componentes.creador_componentes import *
 from ui.vistas.vista_agregar_productos import VistaAgregarProducto
 from ui.vistas.vista_caja import VistaCaja
 from ui.vistas.vista_editar_producto import VistaEditarProducto
+from ui.vistas.vista_inventario import VistaInventario
 
 class VentanaPrincipal(ctk.CTk):
     def __init__(self):
@@ -20,7 +21,7 @@ class VentanaPrincipal(ctk.CTk):
         # --- MENÚ LATERAL ---
         self.frame_menu = nuevo_frame(self, color_fondo=None, radio_esquinas=0, ancho=200)
         self.frame_menu.grid(row=0, column=0, sticky="nsew")
-        self.frame_menu.grid_rowconfigure(4, weight=1)
+        self.frame_menu.grid_rowconfigure(5, weight=1)
         
         self.lbl_logo = nuevo_label(self.frame_menu, "TIENDA", fuente=FUENTE_TITULOS)
         self.lbl_logo.grid(row=0, column=0, padx=20, pady=30)
@@ -34,11 +35,14 @@ class VentanaPrincipal(ctk.CTk):
         self.btn_editar = nuevo_boton(self.frame_menu, "Editar Producto", comando=self.mostrar_editar)
         self.btn_editar.grid(row=3, column=0, padx=20, pady=10)
         
+        self.btn_inventario = nuevo_boton(self.frame_menu, "Inventario", comando=self.mostrar_inventario)
+        self.btn_inventario.grid(row=4, column=0, padx=20, pady=10)
+        
         # --- PANTALLA PREDETERMINADA TEMPORAL ---
         self.frame_contenido = nuevo_frame(self)
         self.frame_contenido.grid(row=0, column=1, sticky="nsew")
         self.vista_actual = None 
-        self.mostrar_caja() # Caja es la pantalla predeterminada mientras se desarrolla
+        self.mostrar_caja() # Caja es la pantalla predeterminada mientras se desarrolla el sistema de usuarios
 
     # --- NAVEGACION ENTRE PANTALLAS ---
     def cambiar_vista(self, nueva_vista_clase):
@@ -58,3 +62,6 @@ class VentanaPrincipal(ctk.CTk):
 
     def mostrar_editar(self):
         self.cambiar_vista(VistaEditarProducto)
+
+    def mostrar_inventario(self):
+            self.cambiar_vista(VistaInventario)
