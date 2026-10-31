@@ -12,6 +12,7 @@ from ui.modales.modal_guardar import ModalGuardar
 from ui.modales.modal_ventas_guardadas import ModalVentasGuardadas
 # Gestores (vista)
 from ui.vistas.secciones.gestor_carrito import GestorCarrito
+from ui.vistas.secciones.gestor_recibo import GestorRecibo
 
 # --- CREACION VISTA CAJA ---
 class VistaCaja(ConfiguracionComponentes):
@@ -94,7 +95,7 @@ class VistaCaja(ConfiguracionComponentes):
 
         self.caja_activa_id = caja_activa.id
 
-        self.frame_principal.grid_columnconfigure(0, weight=8, uniform="grupo1")
+        self.frame_principal.grid_columnconfigure(0, weight=3, uniform="grupo1")
         self.frame_principal.grid_columnconfigure(1, weight=1, uniform="grupo1")
         self.frame_principal.grid_rowconfigure(0, weight=1)
 
@@ -137,7 +138,7 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo=COLOR_EXITO,
             color_hover=COLOR_EXITO_HOVER
         )
-        self.btn_abrir_cobro.pack(pady=10)
+        self.btn_abrir_cobro.pack(fill="x", padx=20, pady=10, ipady=10)
         self.winfo_toplevel().bind("<F12>", lambda event: self.abrir_modal_cobro())
 
         self.btn_guardar = nuevo_boton(
@@ -147,7 +148,7 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo="#d4ac0d", 
             color_hover="#b9770e"
         )
-        self.btn_guardar.pack(pady=5)
+        self.btn_guardar.pack(fill="x", padx=20, pady=10, ipady=10)
         self.winfo_toplevel().bind("<F11>", lambda event: self.abrir_modal_espera())
         
         self.btn_ver_guardadas = nuevo_boton(
@@ -157,7 +158,7 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo="#db4e17", 
             color_hover="#922F10"
         )
-        self.btn_ver_guardadas.pack(pady=5)
+        self.btn_ver_guardadas.pack(fill="x", padx=20, pady=10, ipady=10)
 
         self.btn_cerrar_caja = nuevo_boton(
             frame_derecho, 
@@ -166,12 +167,15 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo=COLOR_FALLO,
             color_hover=COLOR_FALLO_HOVER
         )
-        self.btn_cerrar_caja.pack(pady=20, padx=20, anchor="se")
+        self.btn_cerrar_caja.pack(fill="x", padx=20, pady=10, ipady=10)
         
         # --- INICIALIZACION CARRITO ---
         self.gestor_carrito = GestorCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
         self.gestor_carrito.btn_ver_guardadas = self.btn_ver_guardadas
         self.gestor_carrito.actualizar_ui()
+        
+        # --- INICIALIZACION GESTOR DEL MINI RECIBO ---
+        self.gestor_recibo = GestorRecibo(frame_totales)
 
     # --- POP-UP COBRO ---
     def abrir_modal_cobro(self):
@@ -211,9 +215,9 @@ class VistaCaja(ConfiguracionComponentes):
             
             # --- MENSAJE DE ÉXITO ---
             self.entry_buscar_prod.delete(0, 'end')
-            self.entry_buscar_prod.configure(placeholder_text=f"¡Guardado!, referencia: {referencia}!", placeholder_text_color=COLOR_EXITO)
+            self.entry_buscar_prod.configure(placeholder_text=f"¡Guardado!, referencia: {referencia}", placeholder_text_color=COLOR_EXITO)
 
-            self.after(1500, lambda: [
+            self.after(2000, lambda: [
                 self.focus(), 
                 self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
                 self.entry_buscar_prod.focus()
@@ -230,11 +234,13 @@ class VistaCaja(ConfiguracionComponentes):
     def recuperar_venta(self, venta):
         """Carga los items al carrito y elimina el PENDIENTE de la base de datos."""
         self.gestor_carrito.cargar_items(venta["items"])
-        
+
+        self.cliente_actual = venta["cliente"]
+
         eliminar_venta_pendiente(venta["id"])
-        
+
         self.entry_buscar_prod.delete(0, 'end')
-        self.entry_buscar_prod.configure(placeholder_text=f"¡{venta['cliente']} recuperado!", placeholder_text_color=COLOR_EXITO)
+        self.entry_buscar_prod.configure(placeholder_text=f"¡Pedido de {venta['cliente']} recuperado!", placeholder_text_color=COLOR_EXITO)
         self.after(1500, lambda: [
             self.master.focus(), 
             self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
@@ -281,12 +287,14 @@ class VistaCaja(ConfiguracionComponentes):
                 self.entry_buscar_prod.focus()
             ])
 
-    def procesar_cobro(self, metodo_pago, modal_referencia):
-        """Envía los items guardados en el gestor al BLL."""
+    def procesar_cobro(self, metodo_pago, modal_referencia, entregado=0, vueltas=0):
+        """Envía los items guardados en el gestor al BLL y muestra las vueltas."""
         items_carrito = self.gestor_carrito.items
         
         if not items_carrito:
             return
+
+        total_venta = sum(item['subtotal'] for item in items_carrito)
 
         exito, mensaje = registrar_venta(
             carrito=items_carrito, 
@@ -295,10 +303,32 @@ class VistaCaja(ConfiguracionComponentes):
         )
 
         if exito:
+            cliente_venta = getattr(self, 'cliente_actual', None)
+
+            # Enviar datos al mini recibo
+            self.gestor_recibo.actualizar_recibo(
+                items=items_carrito,
+                total=total_venta,
+                metodo_pago=metodo_pago,
+                entregado=entregado,
+                vueltas=vueltas,
+                cliente=cliente_venta
+            )
+
             self.gestor_carrito.vaciar()
             modal_referencia.destroy()
-            self.entry_buscar_prod.focus()
-            print("¡Venta Exitosa!")
+            
+            if hasattr(self, 'cliente_actual'):
+                del self.cliente_actual
+
+            self.entry_buscar_prod.delete(0, 'end')
+            self.entry_buscar_prod.configure(placeholder_text="¡Venta Exitosa!", placeholder_text_color=COLOR_EXITO)
+
+            self.after(2000, lambda: [
+                self.master.focus(),
+                self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"),
+                self.entry_buscar_prod.focus()
+            ])
         else:
             print(mensaje)
 
