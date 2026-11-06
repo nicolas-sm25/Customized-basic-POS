@@ -67,7 +67,7 @@ class ModalVentasGuardadas:
         self.master.focus()
         self.modal.destroy()
         if hasattr(self.master, 'entry_buscar_prod'):
-            self.master.after(10, self.master.entry_buscar_prod.focus)
+            self.master.after(2000, self.master.entry_buscar_prod.focus)
 
     def redibujar_lista(self):
         for widget in self.frame_lista.winfo_children():
