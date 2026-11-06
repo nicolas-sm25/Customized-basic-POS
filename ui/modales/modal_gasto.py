@@ -41,11 +41,10 @@ class ModalGasto:
         self.modal.after(50, self.entry_desc.focus)
 
     def cerrar_modal(self):
-        """Elimina el modal y devuelve el foco seguro, evitando el cursor fantasma."""
         self.master.focus()
-        if hasattr(self.master, 'entry_buscar_prod'):
-            self.master.entry_buscar_prod.focus()
         self.modal.destroy()
+        if hasattr(self.master, 'entry_buscar_prod'):
+            self.master.after(10, self.master.entry_buscar_prod.focus)
 
     def formatear_moneda(self, event=None):
         texto_limpio = ''.join(filter(str.isdigit, self.entry_monto.get().replace(".", "")))

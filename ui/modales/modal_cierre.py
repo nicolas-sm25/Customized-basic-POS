@@ -72,9 +72,9 @@ class ModalCierre:
 
     def cerrar_modal(self):
         self.master.focus()
-        if hasattr(self.master, 'entry_buscar_prod'):
-            self.master.entry_buscar_prod.focus()
         self.modal.destroy()
+        if hasattr(self.master, 'entry_buscar_prod'):
+            self.master.after(10, self.master.entry_buscar_prod.focus)
 
     def crear_fila_stat(self, master, label, valor, color="#ffffff", bold=False):
         f = nuevo_frame(master, color_fondo="transparent")

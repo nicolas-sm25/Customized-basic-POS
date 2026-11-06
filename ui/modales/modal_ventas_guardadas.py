@@ -65,9 +65,9 @@ class ModalVentasGuardadas:
 
     def cerrar_modal(self):
         self.master.focus()
-        if hasattr(self.master, 'entry_buscar_prod'):
-            self.master.entry_buscar_prod.focus()
         self.modal.destroy()
+        if hasattr(self.master, 'entry_buscar_prod'):
+            self.master.after(10, self.master.entry_buscar_prod.focus)
 
     def redibujar_lista(self):
         for widget in self.frame_lista.winfo_children():
