@@ -129,6 +129,10 @@ class VistaEditarProducto(ConfiguracionComponentes):
                 producto = resultados[0] 
 
         if producto:
+            if not producto.get('activo', True):
+                self.reiniciar_pantalla("Este producto se encuentra inhabilitado, habilitelo desde el menú inventario para editarlo.", color="#d4ac0d")
+                return
+
             self.producto_id_actual = producto["id"]
             self.nombre_actual = producto["nombre"]
             self.codigo_actual = producto["codigo_barras"]

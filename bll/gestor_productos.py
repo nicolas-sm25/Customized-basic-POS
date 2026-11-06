@@ -37,13 +37,11 @@ def agregar_producto(nombre, costo, precio_venta, codigo_barras=None, stock=0, e
 
 
 def buscar_productos_por_nombre(nombre_parcial):
-    
     sesion = SessionLocal()
-    
     try:
+        # PARCHE: Quitamos el filtro de activo == True para que la UI decida
         productos = sesion.query(Producto).filter(
-            Producto.nombre.ilike(f"%{nombre_parcial}%"), 
-            Producto.activo == True
+            Producto.nombre.ilike(f"%{nombre_parcial}%")
         ).all()
         
         return [{
@@ -52,18 +50,18 @@ def buscar_productos_por_nombre(nombre_parcial):
             "codigo_barras": p.codigo_barras,
             "costo": p.costo,
             "precio_venta": p.precio_venta,
-            "stock": p.stock
+            "stock": p.stock,
+            "activo": p.activo
         } for p in productos]
     except Exception:
         return []
     finally:
         sesion.close()
 
-
 def buscar_producto_por_codigo(codigo):
     sesion = SessionLocal()
     try:
-        producto = sesion.query(Producto).filter(Producto.codigo_barras == codigo, Producto.activo == True).first()
+        producto = sesion.query(Producto).filter(Producto.codigo_barras == codigo).first()
         if producto:
             return {
                 "id": producto.id,
@@ -71,7 +69,8 @@ def buscar_producto_por_codigo(codigo):
                 "codigo_barras": producto.codigo_barras,
                 "costo": producto.costo,
                 "precio_venta": producto.precio_venta,
-                "stock": producto.stock
+                "stock": producto.stock,
+                "activo": producto.activo
             }
         return None
     except Exception:
@@ -148,10 +147,13 @@ def sincronizar_stock_relacional(sesion, producto_id, cantidad_agregada):
             paquete.stock = producto_db.stock // paquete.cantidad_por_paquete
 
 def obtener_productos_unitarios():
-    """Devuelve solo los productos que NO son paquetes para el menú desplegable."""
+    """Devuelve solo los productos que NO son paquetes y están ACTIVOS para el menú desplegable."""
     sesion = SessionLocal()
     try:
-        productos = sesion.query(Producto).filter(Producto.es_paquete == False).all()
+        productos = sesion.query(Producto).filter(
+            Producto.es_paquete == False, 
+            Producto.activo == True
+        ).all()
         return [{"id": p.id, "nombre": p.nombre} for p in productos]
     finally:
         sesion.close()

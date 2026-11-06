@@ -322,6 +322,17 @@ class VistaCaja(ConfiguracionComponentes):
                 producto = resultados[0]
 
         if producto:
+            if not producto.get('activo', True):
+                self.entry_buscar_prod.delete(0, 'end')
+                self.focus()
+                self.entry_buscar_prod.configure(placeholder_text="¡Producto inhabilitado!", placeholder_text_color="#d4ac0d")
+                self.after(1500, lambda: [
+                    self.master.focus(), 
+                    self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
+                    self.entry_buscar_prod.focus()
+                ])
+                return
+
             self.panel_carrito.agregar_producto(producto)
             self.entry_buscar_prod.delete(0, 'end')
         else:
