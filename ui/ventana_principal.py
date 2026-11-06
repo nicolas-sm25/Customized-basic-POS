@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import logging
 from ui.componentes.creador_componentes import *
 from ui.vistas.vista_agregar_productos import VistaAgregarProducto
 from ui.vistas.vista_caja import VistaCaja
@@ -11,6 +12,8 @@ from ui.vistas.vista_configuracion import VistaConfiguracion
 class VentanaPrincipal(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        self.report_callback_exception = self.capturar_errores_ui
         
         self.title("Sistema POS - Mi Tienda")
         self.geometry("950x650")
@@ -43,6 +46,7 @@ class VentanaPrincipal(ctk.CTk):
 
         self.lbl_logo = nuevo_label(self.frame_menu, "TIENDA", fuente=FUENTE_TITULOS)
         self.lbl_logo.grid(row=0, column=0, padx=20, pady=20)
+        
 
         # Info del usuario conectado
         nuevo_label(self.frame_menu, f"User: {self.usuario_actual['nombre']}\nRol: {self.usuario_actual['rol']}", fuente=("Arial", 11), color_texto="#d4ac0d").grid(row=1, column=0, padx=20, pady=(0, 15))
@@ -99,3 +103,8 @@ class VentanaPrincipal(ctk.CTk):
         for widget in self.frame_menu.winfo_children():
             widget.destroy()
         ModalLogin(self, self.iniciar_sesion_exitoso)
+        
+    # --- CAPTURA DE ERRORES EN LA INTERFAZ ---
+    def capturar_errores_ui(self, exc_type, exc_value, exc_traceback):
+        """Atrapa errores en eventos de Tkinter (botones, teclado) y los guarda silenciosamente sin cerrar la app."""
+        logging.error("Error menor en UI capturado:", exc_info=(exc_type, exc_value, exc_traceback))
