@@ -1,5 +1,5 @@
 import customtkinter as ctk
-import logging
+import tkinter.messagebox as messagebox
 from ui.componentes.creador_componentes import *
 from ui.vistas.vista_agregar_productos import VistaAgregarProducto
 from ui.vistas.vista_caja import VistaCaja
@@ -9,11 +9,11 @@ from ui.vistas.vista_historial import VistaHistorial
 from ui.modales.modal_login import ModalLogin
 from ui.vistas.vista_configuracion import VistaConfiguracion
 
+from bll.gestor_caja import obtener_caja_abierta
+
 class VentanaPrincipal(ctk.CTk):
     def __init__(self):
         super().__init__()
-
-        self.report_callback_exception = self.capturar_errores_ui
         
         self.title("Sistema POS - Mi Tienda")
         self.geometry("950x650")
@@ -21,6 +21,9 @@ class VentanaPrincipal(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         
         self.usuario_actual = None
+
+        # --- INTERCEPCIÓN DEL CIERRE DE WINDOWS ---
+        self.protocol("WM_DELETE_WINDOW", self.intentar_cerrar_app)
 
         # --- MENÚ LATERAL (Oculto inicialmente hasta loguearse) ---
         self.frame_menu = nuevo_frame(self, color_fondo=None, radio_esquinas=0, ancho=200)
@@ -46,7 +49,6 @@ class VentanaPrincipal(ctk.CTk):
 
         self.lbl_logo = nuevo_label(self.frame_menu, "TIENDA", fuente=FUENTE_TITULOS)
         self.lbl_logo.grid(row=0, column=0, padx=20, pady=20)
-        
 
         # Info del usuario conectado
         nuevo_label(self.frame_menu, f"User: {self.usuario_actual['nombre']}\nRol: {self.usuario_actual['rol']}", fuente=("Arial", 11), color_texto="#d4ac0d").grid(row=1, column=0, padx=20, pady=(0, 15))
@@ -55,11 +57,11 @@ class VentanaPrincipal(ctk.CTk):
         self.btn_caja = nuevo_boton(self.frame_menu, "Caja", comando=self.mostrar_caja)
         self.btn_caja.grid(row=2, column=0, padx=20, pady=8)
 
-        # 2. Inventario (Disponible para todos, pero evaluaremos el rol de edición dentro de la vista si es necesario)
+        # 2. Inventario 
         self.btn_inventario = nuevo_boton(self.frame_menu, "Inventario", comando=self.mostrar_inventario)
         self.btn_inventario.grid(row=3, column=0, padx=20, pady=8)
 
-        # Si es Administrador, mostramos las funciones gerenciales y de gestión
+        # Si es Administrador, mostramos las funciones gerenciales
         if self.usuario_actual['rol'] == "Administrador":
             self.btn_agregar = nuevo_boton(self.frame_menu, "Agregar Producto", comando=self.mostrar_agregar)
             self.btn_agregar.grid(row=4, column=0, padx=20, pady=8)
@@ -96,15 +98,23 @@ class VentanaPrincipal(ctk.CTk):
         self.vista_actual = VistaConfiguracion(self.frame_contenido, self.cerrar_sesion)
         self.vista_actual.pack(fill="both", expand=True, padx=20, pady=20)
 
+    # --- LÓGICA DE BLOQUEO DE CIERRE ---
+    def intentar_cerrar_app(self):
+        """Se ejecuta cuando el usuario le da a la X roja de la ventana."""
+        if obtener_caja_abierta():
+            messagebox.showwarning("Cierre Denegado", "Debes hacer el Cierre de Caja antes de salir del programa.")
+            return 
+        self.destroy()
+
     def cerrar_sesion(self):
+        """Se ejecuta desde el botón de cerrar sesión en Configuración."""
+        if obtener_caja_abierta():
+            messagebox.showwarning("Cierre Denegado", "Debes hacer el Cierre de Caja antes de cerrar sesión.")
+            return 
+
         if self.vista_actual:
             self.vista_actual.destroy()
             self.vista_actual = None
         for widget in self.frame_menu.winfo_children():
             widget.destroy()
         ModalLogin(self, self.iniciar_sesion_exitoso)
-        
-    # --- CAPTURA DE ERRORES EN LA INTERFAZ ---
-    def capturar_errores_ui(self, exc_type, exc_value, exc_traceback):
-        """Atrapa errores en eventos de Tkinter (botones, teclado) y los guarda silenciosamente sin cerrar la app."""
-        logging.error("Error menor en UI capturado:", exc_info=(exc_type, exc_value, exc_traceback))

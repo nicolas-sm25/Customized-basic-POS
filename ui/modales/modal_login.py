@@ -32,7 +32,6 @@ class ModalLogin:
         # Atajos de teclado
         self.entry_user.bind("<Return>", lambda e: self.entry_pass.focus())
         self.entry_pass.bind("<Return>", lambda e: self.intentar_login())
-        self.modal.bind("<Return>", lambda e: self.intentar_login())
         
         self.modal.after(50, self.entry_user.focus)
 
