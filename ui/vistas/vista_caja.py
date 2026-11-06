@@ -296,6 +296,15 @@ class VistaCaja(ConfiguracionComponentes):
 
     # --- POP-UP CIERRE CAJA ---
     def confirmar_cierre_caja(self):
+        if hasattr(self, 'panel_carrito') and self.panel_carrito.items:
+            self.entry_buscar_prod.delete(0, 'end')
+            self.entry_buscar_prod.configure(placeholder_text="¡Vacíe o guarde el carrito antes de cerrar!", placeholder_text_color=COLOR_FALLO)
+            self.after(2500, lambda: [
+                self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"),
+                self.entry_buscar_prod.focus()
+            ])
+            return
+
         from ui.modales.modal_cierre import ModalCierre
         ModalCierre(self, self.caja_activa_id, self.ejecutar_cierre)
     
