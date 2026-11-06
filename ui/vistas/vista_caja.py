@@ -7,12 +7,10 @@ from ui.componentes.configuracion_componentes import *
 from ui.componentes.creador_componentes import *
 # Modales/Pop-ups
 from ui.modales.modal_cobro import ModalCobro
-from ui.modales.modal_cierre import ModalCierre
 from ui.modales.modal_guardar import ModalGuardar
-from ui.modales.modal_ventas_guardadas import ModalVentasGuardadas
 # Gestores (vista)
-from ui.vistas.secciones.gestor_carrito import GestorCarrito
-from ui.vistas.secciones.gestor_recibo import GestorRecibo
+from ui.vistas.secciones.panel_carrito import PanelCarrito
+from ui.vistas.secciones.panel_recibo import PanelRecibo
 
 # --- CREACION VISTA CAJA ---
 class VistaCaja(ConfiguracionComponentes):
@@ -94,7 +92,6 @@ class VistaCaja(ConfiguracionComponentes):
 
     # --- MENÚ VENTAS ---
     def mostrar_pantalla_ventas(self, caja_activa):
-        self.carrito = [] # * ---> Inicializacion del carrito
 
         self.caja_activa_id = caja_activa.id
 
@@ -196,18 +193,18 @@ class VistaCaja(ConfiguracionComponentes):
         self.btn_cerrar_caja.pack(fill="x", padx=15, pady=5, ipady=5)
         
         # --- INICIALIZACIÓN CARRITO ---
-        self.gestor_carrito = GestorCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
-        self.gestor_carrito.btn_ver_guardadas = self.btn_ver_guardadas
-        self.gestor_carrito.actualizar_ui()
+        self.panel_carrito = PanelCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
+        self.panel_carrito.btn_ver_guardadas = self.btn_ver_guardadas
+        self.panel_carrito.actualizar_ui()
         
         # --- INICIALIZACIÓN GESTOR DEL MINI RECIBO ---
-        self.gestor_recibo = GestorRecibo(frame_recibo_container)
+        self.panel_recibo = PanelRecibo(frame_recibo_container)
 
     # --- POP-UP COBRO ---
     def abrir_modal_cobro(self):
 
         # Evitar cobro con el carrito vacio
-        if not hasattr(self, 'gestor_carrito') or not self.gestor_carrito.items:
+        if not hasattr(self, 'panel_carrito') or not self.panel_carrito.items:
             self.lbl_valor_total.configure(text="¡Vacío!", text_color=COLOR_FALLO)
             self.after(1500, lambda: self.lbl_valor_total.configure(text="$0", text_color=COLOR_EXITO))
             return
@@ -218,7 +215,7 @@ class VistaCaja(ConfiguracionComponentes):
     # --- POP-UP GUARDAR ---
     def abrir_modal_espera(self):
         """Abre el modal personalizado para guardar ventas fiadas."""
-        if not hasattr(self, 'gestor_carrito') or not self.gestor_carrito.items:
+        if not hasattr(self, 'panel_carrito') or not self.panel_carrito.items:
             self.lbl_valor_total.configure(text="¡Vacío!", text_color=COLOR_FALLO)
             self.after(1500, lambda: self.lbl_valor_total.configure(text="$0", text_color=COLOR_EXITO))
             return
@@ -228,7 +225,7 @@ class VistaCaja(ConfiguracionComponentes):
     def procesar_espera(self, referencia, modal_referencia):
         """Envía los datos al BLL y muestra el éxito en la UI."""
         exito, mensaje = registrar_venta(
-            carrito=self.gestor_carrito.items,
+            carrito=self.panel_carrito.items,
             metodo_pago="Pendiente",
             caja_id=self.caja_activa_id,
             nombre_cliente=referencia,
@@ -236,7 +233,7 @@ class VistaCaja(ConfiguracionComponentes):
         )
 
         if exito:
-            self.gestor_carrito.vaciar()
+            self.panel_carrito.vaciar()
             modal_referencia.cerrar_modal()
             
             # --- MENSAJE DE ÉXITO ---
@@ -270,7 +267,8 @@ class VistaCaja(ConfiguracionComponentes):
         ModalVentasGuardadas(self, ventas_pendientes, self.recuperar_venta, self.eliminar_venta_guardada)
 
     def recuperar_venta(self, venta):
-        self.gestor_carrito.cargar_items(venta["items"])
+        self.panel_carrito.vaciar()
+        self.panel_carrito.cargar_items(venta["items"])
         self.cliente_actual = venta["cliente"]
         eliminar_venta_pendiente(venta["id"])
         
@@ -324,7 +322,7 @@ class VistaCaja(ConfiguracionComponentes):
                 producto = resultados[0]
 
         if producto:
-            self.gestor_carrito.agregar_producto(producto)
+            self.panel_carrito.agregar_producto(producto)
             self.entry_buscar_prod.delete(0, 'end')
         else:
             self.entry_buscar_prod.delete(0, 'end')
@@ -338,7 +336,7 @@ class VistaCaja(ConfiguracionComponentes):
 
     def procesar_cobro(self, metodo_pago, modal_referencia, entregado=0, vueltas=0):
         """Envía los items guardados en el gestor al BLL y muestra las vueltas."""
-        items_carrito = self.gestor_carrito.items
+        items_carrito = self.panel_carrito.items
         
         if not items_carrito:
             return
@@ -355,7 +353,7 @@ class VistaCaja(ConfiguracionComponentes):
             cliente_venta = getattr(self, 'cliente_actual', None)
 
             # Enviar datos al mini recibo
-            self.gestor_recibo.actualizar_recibo(
+            self.panel_recibo.actualizar_recibo(
                 items=items_carrito,
                 total=total_venta,
                 metodo_pago=metodo_pago,
@@ -364,7 +362,7 @@ class VistaCaja(ConfiguracionComponentes):
                 cliente=cliente_venta
             )
 
-            self.gestor_carrito.vaciar()
+            self.panel_carrito.vaciar()
             modal_referencia.cerrar_modal()
             
             if hasattr(self, 'cliente_actual'):

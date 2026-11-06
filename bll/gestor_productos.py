@@ -1,6 +1,4 @@
 from dal.conexion_DB import SessionLocal
-from dal.modelos.productos import Producto
-
 from dal.modelos.productos import Producto 
 
 def agregar_producto(nombre, costo, precio_venta, codigo_barras=None, stock=0, es_paquete=False, producto_base_id=None, cantidad_por_paquete=1):

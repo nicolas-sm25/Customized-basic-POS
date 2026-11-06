@@ -145,7 +145,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
             stock = int(stock_str) if stock_str else 0
             codigo = codigo if codigo else None
 
-            if costo <= 0 or precio <= 0 or stock < 0:
+            if costo < 0 or precio <= 0 or stock < 0:
                 self.lbl_mensaje.configure(text="Los valores numéricos no pueden ser negativos.", text_color="red")
                 return
             
@@ -176,7 +176,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
                     self.lbl_mensaje.configure(text="Ingrese una cantidad válida para el paquete.", text_color="red")
                     return
 
-            if stock < 0:
+                if stock < 0:
                     self.lbl_mensaje.configure(text="El stock del paquete no puede ser negativo.", text_color="red")
                     return
 

@@ -2,7 +2,7 @@ import customtkinter as ctk
 from datetime import datetime
 from ui.componentes.creador_componentes import nuevo_frame, nuevo_label, COLOR_EXITO
 
-class GestorRecibo:
+class PanelRecibo:
     def __init__(self, master_frame):
         self.frame_principal = nuevo_frame(master_frame, color_fondo="#1e1e1e", radio_esquinas=15)
         self.frame_principal.pack(pady=20, fill="both", expand=True, padx=10)

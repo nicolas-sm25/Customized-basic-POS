@@ -1,7 +1,7 @@
 from ui.componentes.creador_componentes import nuevo_frame, nuevo_label, nuevo_boton, nueva_caja_texto
 from ui.componentes.creador_componentes import COLOR_FALLO, COLOR_FALLO_HOVER, COLOR_EXITO
 
-class GestorCarrito:
+class PanelCarrito:
     """Clase independiente encargada de renderizar y calcular el carrito de compras."""
     def __init__(self, frame_contenedor, lbl_total, entry_buscador):
         self.frame_carrito = frame_contenedor
@@ -64,7 +64,6 @@ class GestorCarrito:
         for index, item in enumerate(self.items):
             total += item['subtotal']
             
-            # Filas más altas (ipady en el frame o pady en los componentes internos)
             frame_item = nuevo_frame(self.frame_carrito, color_fondo="#2b2b2b")
             frame_item.pack(fill="x", pady=4, padx=10)
             
@@ -73,7 +72,6 @@ class GestorCarrito:
             frame_item.grid_columnconfigure(2, weight=2, uniform="carr")
             frame_item.grid_columnconfigure(3, weight=3, uniform="carr")
 
-            # Textos más grandes (Arial 16)
             lbl_nombre = nuevo_label(frame_item, item['nombre'], fuente=("Arial", 16, "bold"), color_texto="#4fa6ff", poscicion="w")
             lbl_nombre.grid(row=0, column=0, sticky="w", padx=10, pady=10)
 
@@ -88,7 +86,7 @@ class GestorCarrito:
             frame_controles.grid(row=0, column=3, sticky="e", padx=10, pady=5)
 
             if item.get("recuperado"):
-                # FIX: Ahora mostramos la cantidad real antes del texto de recuperado
+
                 texto_bloqueado = f"{item['cantidad']} unid. (Recuperado)"
                 lbl_bloqueado = nuevo_label(frame_controles, texto_bloqueado, color_texto="#d4ac0d", fuente=("Arial", 14, "bold"))
                 lbl_bloqueado.pack(side="right", padx=5)
@@ -99,7 +97,6 @@ class GestorCarrito:
                 btn_mas = nuevo_boton(frame_controles, "+", comando=lambda i=index: self.cambiar_cantidad(i, 1), ancho=40)
                 btn_mas.pack(side="right", padx=4)
 
-                # Caja de texto más grande
                 entry_cant = nueva_caja_texto(frame_controles)
                 entry_cant.configure(width=60, font=("Arial", 16), justify="center")
                 entry_cant.insert(0, str(item['cantidad']))
@@ -109,7 +106,6 @@ class GestorCarrito:
                 btn_menos = nuevo_boton(frame_controles, "-", comando=lambda i=index: self.cambiar_cantidad(i, -1), ancho=40)
                 btn_menos.pack(side="right", padx=4)
 
-        # Actualizar total global
         self.lbl_total.configure(text=f"${int(total):,}".replace(",", "."))
 
     def eliminar_item(self, index):
@@ -138,8 +134,6 @@ class GestorCarrito:
     def vaciar(self):
         """Limpia el carrito completamente después de una venta."""
         self.items.clear()
-        if hasattr(self.frame_carrito.master.master.master, 'cliente_actual'):
-            del self.frame_carrito.master.master.master.cliente_actual
         self.actualizar_ui()
 
     def cargar_items(self, lista_items):
