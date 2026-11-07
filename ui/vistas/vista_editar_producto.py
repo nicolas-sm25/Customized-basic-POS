@@ -5,14 +5,20 @@ from ui.componentes.creador_componentes import *
 class VistaEditarProducto(ConfiguracionComponentes):
     def __init__(self, master):
         super().__init__(master)
+
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        self.frame_central = nuevo_frame(self, color_fondo="transparent")
+        self.frame_central.grid(row=1, column=0)
         
         # --- TÍTULO ---
-        self.lbl_titulo = nuevo_label(self, "Buscar y Editar Producto", fuente=FUENTE_TITULOS)
+        self.lbl_titulo = nuevo_label(self.frame_central, "Buscar y Editar Producto", fuente=FUENTE_TITULOS)
         self.lbl_titulo.pack(pady=15)
         
-        
         # --- BÚSQUEDA DE PRODUCTOS ---
-        self.frame_busqueda = nuevo_frame(self)
+        self.frame_busqueda = nuevo_frame(self.frame_central)
         self.frame_busqueda.pack(pady=5)
 
         self.entry_busqueda = nueva_caja_texto(self.frame_busqueda, placeholder="Código o Nombre...")
@@ -23,7 +29,7 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.btn_buscar.grid(row=0, column=1, padx=5)
 
         # --- INFO PRINCIPAL DE PRODUCTOS ---
-        self.frame_edicion = nuevo_frame(self)
+        self.frame_edicion = nuevo_frame(self.frame_central)
         self.frame_edicion.pack(pady=15)
 
         self.lbl_nombre = nuevo_label(self.frame_edicion, "Nombre:", fuente=FUENTE_NEGRITA, poscicion="e")
@@ -35,7 +41,6 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.lbl_codigo.grid(row=1, column=0, padx=5, pady=5)
         self.lbl_valor_codigo = nuevo_label(self.frame_edicion, "-", poscicion="w")
         self.lbl_valor_codigo.grid(row=1, column=1, padx=5, pady=5, sticky="w")
-        
         
         # --- ACTUALIZAR INFO ---
         self.lbl_costo = nuevo_label(self.frame_edicion, "Costo:", poscicion="e")
@@ -66,7 +71,7 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.entry_stock.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
         
         # --- BOTONES ---
-        self.frame_botones = nuevo_frame(self)
+        self.frame_botones = nuevo_frame(self.frame_central)
         self.frame_botones.pack(pady=10)
 
         self.btn_guardar = nuevo_boton(self.frame_botones, "Guardar Cambios", comando=self.guardar_cambios, color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER)
@@ -78,7 +83,7 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.btn_cancelar.configure(state="disabled")
 
         # --- MENSAJE DE ESTADO ---
-        self.lbl_mensaje = nuevo_label(self, "")
+        self.lbl_mensaje = nuevo_label(self.frame_central, "")
         self.lbl_mensaje.pack(pady=5)
 
         # --- LISTA DE ENTRADAS EDITABLES PARA LIMPIEZA Y BLOQUEO ---

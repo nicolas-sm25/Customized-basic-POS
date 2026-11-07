@@ -6,35 +6,42 @@ from ui.componentes.creador_componentes import *
 class VistaAgregarProducto(ConfiguracionComponentes):
     def __init__(self, master):
         super().__init__(master)
+
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        self.frame_central = nuevo_frame(self, color_fondo="transparent")
+        self.frame_central.grid(row=1, column=0)
         
         # --- TÍTULO ---
-        self.lbl_titulo = nuevo_label(self, "Agregar Producto", fuente=FUENTE_TITULOS)
+        self.lbl_titulo = nuevo_label(self.frame_central, "Agregar Producto", fuente=FUENTE_TITULOS)
         self.lbl_titulo.pack(pady=15)
 
         # --- ENTRADAS DE DATOS BÁSICOS ---
-        self.entry_nombre = nueva_caja_texto(self, placeholder="Nombre del producto")
+        self.entry_nombre = nueva_caja_texto(self.frame_central, placeholder="Nombre del producto")
         self.entry_nombre.pack(pady=10)
         self.entry_nombre.bind("<Return>", lambda event: self.entry_codigo.focus())
         self.entry_nombre.bind("<Escape>", lambda event: self.cancelar_registro())
 
-        self.entry_codigo = nueva_caja_texto(self, placeholder="Código de Barras (Opcional)")
+        self.entry_codigo = nueva_caja_texto(self.frame_central, placeholder="Código de Barras (Opcional)")
         self.entry_codigo.pack(pady=10)
         self.entry_codigo.bind("<Return>", lambda event: self.entry_costo.focus())
         self.entry_codigo.bind("<Escape>", lambda event: self.cancelar_registro())
 
-        self.entry_costo = nueva_caja_texto(self, placeholder="Costo")
+        self.entry_costo = nueva_caja_texto(self.frame_central, placeholder="Costo")
         self.entry_costo.pack(pady=10)
         self.entry_costo.bind("<Return>", lambda event: self.entry_precio.focus())
         self.entry_costo.bind("<Escape>", lambda event: self.cancelar_registro())
         self.entry_costo.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_costo))
         
-        self.entry_precio = nueva_caja_texto(self, placeholder="Precio de Venta")
+        self.entry_precio = nueva_caja_texto(self.frame_central, placeholder="Precio de Venta")
         self.entry_precio.pack(pady=10)
         self.entry_precio.bind("<Return>", lambda event: self.entry_stock.focus())
         self.entry_precio.bind("<Escape>", lambda event: self.cancelar_registro())
         self.entry_precio.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_precio))
 
-        self.entry_stock = nueva_caja_texto(self, placeholder="Stock Inicial")
+        self.entry_stock = nueva_caja_texto(self.frame_central, placeholder="Stock Inicial")
         self.entry_stock.pack(pady=10)
         self.entry_stock.bind("<Return>", self.guardar_producto)
         self.entry_stock.bind("<Escape>", lambda event: self.cancelar_registro())
@@ -43,7 +50,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         # --- INTERRUPTOR DE RELACIÓN ---
         self.var_paquete = ctk.BooleanVar(value=False)
         self.switch_paquete = ctk.CTkSwitch(
-            self, 
+            self.frame_central, 
             text="¿Es un paquete de otro producto?",
             command=self.alternar_paquete,
             variable=self.var_paquete,
@@ -53,7 +60,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         self.switch_paquete.pack(pady=(15, 5))
 
         # --- PANEL RELACIONAL ---
-        self.frame_relacional = nuevo_frame(self, color_fondo="#2b2b2b")
+        self.frame_relacional = nuevo_frame(self.frame_central, color_fondo="#2b2b2b")
 
         nuevo_label(
             self.frame_relacional, 
@@ -86,7 +93,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         self.entry_cant_paquete.pack(pady=(2, 15), padx=20)
 
         # --- BOTONES ---
-        self.frame_botones = nuevo_frame(self)
+        self.frame_botones = nuevo_frame(self.frame_central)
         self.frame_botones.pack(pady=20)
 
         self.btn_guardar = nuevo_boton(self.frame_botones, "Guardar Producto", self.guardar_producto, color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER)
@@ -96,7 +103,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         self.btn_cancelar.grid(row=0, column=1, padx=10)
         
         # --- MENSAJE DE ESTADO ---
-        self.lbl_mensaje = nuevo_label(self, "")
+        self.lbl_mensaje = nuevo_label(self.frame_central, "")
         self.lbl_mensaje.pack(pady=5)
         
         # --- LISTA DE ENTRADAS EDITABLES PARA LIMPIEZA Y BLOQUEO ---

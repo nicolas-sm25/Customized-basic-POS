@@ -73,11 +73,11 @@ class VistaInventario(ConfiguracionComponentes):
         # --- CABECERA DE LA TABLA ---
         f_enc = nuevo_frame(self.scroll_tabla, color_fondo="#1a1a1a")
         f_enc.pack(fill="x", pady=(0, 5), padx=5)
-        
-        cols = [3, 2, 2, 2, 3, 2]
+
+        cols = [4, 2, 2, 2, 2]
         for i, w in enumerate(cols): f_enc.grid_columnconfigure(i, weight=w, uniform="inv")
-        
-        titulos = [("Producto", "w"), ("Costo", "e"), ("Precio Venta", "e"), ("Stock", "center"), ("Paquete de", "center"), ("Acciones", "center")]
+
+        titulos = [("Producto", "w"), ("Costo", "e"), ("Precio Venta", "e"), ("Stock", "center"), ("Acciones", "center")]
         for idx, (t, a) in enumerate(titulos):
             anclaje = "nsew" if a == "center" else a
             nuevo_label(f_enc, t, fuente=("Arial", 14, "bold"), color_texto="#a0a0a0", poscicion=a).grid(row=0, column=idx, sticky=anclaje, padx=10 if a=="w" else 0, pady=8)
@@ -89,8 +89,17 @@ class VistaInventario(ConfiguracionComponentes):
             
             for i, w in enumerate(cols): f_item.grid_columnconfigure(i, weight=w, uniform="inv")
 
-            nuevo_label(f_item, prod['nombre'], fuente=("Arial", 18, "bold"), color_texto="#4fa6ff", poscicion="w").grid(row=0, column=0, sticky="w", padx=10, pady=10)
+            f_nombre_paq = nuevo_frame(f_item, color_fondo="transparent")
+            f_nombre_paq.grid(row=0, column=0, sticky="w", padx=10, pady=10)
             
+            nuevo_label(f_nombre_paq, prod['nombre'], fuente=("Arial", 18, "bold"), color_texto="#4fa6ff", poscicion="w").pack(side="left")
+            
+            if prod['es_paquete']:
+                texto_paq = f" (Paq. de: {prod['info_paquete']})"
+                if prod['unidad_inactiva']: texto_paq += " ⚠️ Base Inactiva"
+                color_paq = COLOR_FALLO if prod['unidad_inactiva'] else "#888888"
+                nuevo_label(f_nombre_paq, texto_paq, fuente=("Arial", 11, "italic"), color_texto=color_paq, poscicion="w").pack(side="left", padx=(5,0), pady=(3,0))
+
             nuevo_label(f_item, f"${int(prod['costo']):,}".replace(",", "."), fuente=("Arial", 16), color_texto="#cccccc").grid(row=0, column=1, sticky="e", pady=10)
             nuevo_label(f_item, f"${int(prod['precio_venta']):,}".replace(",", "."), fuente=("Arial", 16, "bold"), color_texto=COLOR_EXITO).grid(row=0, column=2, sticky="e", pady=10)
             
@@ -98,17 +107,14 @@ class VistaInventario(ConfiguracionComponentes):
             texto_stock = f"{prod['stock']} ⚠️" if prod['stock'] <= 0 else str(prod['stock'])
             nuevo_label(f_item, texto_stock, fuente=("Arial", 16, "bold"), color_texto=color_stock, poscicion="center").grid(row=0, column=3, sticky="nsew", pady=10)
             
-            texto_paq = f"{prod['info_paquete']} ⚠️ (Unidad Inactiva)" if prod['unidad_inactiva'] else prod['info_paquete']
-            color_paq = COLOR_FALLO if prod['unidad_inactiva'] else ("#d4ac0d" if prod['es_paquete'] else "#666666")
-            nuevo_label(f_item, texto_paq, fuente=("Arial", 14, "bold"), color_texto=color_paq, poscicion="center").grid(row=0, column=4, sticky="nsew", pady=10)
-            
+            # Botones de Acción
             frame_btn = nuevo_frame(f_item, color_fondo="transparent")
-            frame_btn.grid(row=0, column=5, sticky="nsew", padx=5, pady=5)
+            frame_btn.grid(row=0, column=4, sticky="nsew", padx=5, pady=5)
             
             criterio_busqueda = prod.get('codigo_barras') if prod.get('codigo_barras') else prod.get('nombre', '')
-            nuevo_boton(frame_btn, "Editar", comando=lambda c=criterio_busqueda: self.winfo_toplevel().mostrar_editar(c), color_fondo="#3498db", color_hover="#2980b9", ancho=65).pack(side="left", padx=0, expand=True)
+            nuevo_boton(frame_btn, "Editar", comando=lambda c=criterio_busqueda: self.winfo_toplevel().mostrar_editar(c), color_fondo="#3498db", color_hover="#2980b9", ancho=65).pack(side="left", padx=5, expand=True)
 
-            nuevo_boton(frame_btn, "Deshabilitar", comando=lambda id=prod['id'], n=prod['nombre']: self.confirmar_cambio_estado(id, n, False), color_fondo="#961605", color_hover="#631106", ancho=90).pack(side="right", padx=3, expand=True)
+            nuevo_boton(frame_btn, "Deshabilitar", comando=lambda id=prod['id'], n=prod['nombre']: self.confirmar_cambio_estado(id, n, False), color_fondo="#961605", color_hover="#631106", ancho=90).pack(side="right", padx=5, expand=True)
 
         # --- ALERTA DE STOCK NEGATIVO ---
         if any(p['stock'] < 0 for p in productos_activos):
