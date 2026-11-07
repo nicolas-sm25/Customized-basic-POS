@@ -199,6 +199,8 @@ class VistaCaja(ConfiguracionComponentes):
         
         # --- INICIALIZACIÓN GESTOR DEL MINI RECIBO ---
         self.panel_recibo = PanelRecibo(frame_recibo_container)
+        
+        self.actualizar_contador_guardadas()
 
     # --- POP-UP COBRO ---
     def abrir_modal_cobro(self):
@@ -235,6 +237,7 @@ class VistaCaja(ConfiguracionComponentes):
         if exito:
             self.panel_carrito.vaciar()
             modal_referencia.cerrar_modal()
+            self.actualizar_contador_guardadas()
             
             # --- MENSAJE DE ÉXITO ---
             self.entry_buscar_prod.delete(0, 'end')
@@ -271,6 +274,7 @@ class VistaCaja(ConfiguracionComponentes):
         self.panel_carrito.cargar_items(venta["items"])
         self.cliente_actual = venta["cliente"]
         eliminar_venta_pendiente(venta["id"])
+        self.actualizar_contador_guardadas()
         
         self.entry_buscar_prod.delete(0, 'end')
         self.entry_buscar_prod.configure(placeholder_text=f"¡Pedido de {venta['cliente']} recuperado!", placeholder_text_color=COLOR_EXITO)
@@ -285,6 +289,7 @@ class VistaCaja(ConfiguracionComponentes):
         exito = eliminar_venta_pendiente(venta_id)
         if exito:
             self.entry_buscar_prod.configure(placeholder_text="¡Pedido eliminado!", placeholder_text_color=COLOR_EXITO)
+            self.actualizar_contador_guardadas()
         else:
             self.entry_buscar_prod.configure(placeholder_text="Error al eliminar", placeholder_text_color=COLOR_FALLO)
         
@@ -398,6 +403,11 @@ class VistaCaja(ConfiguracionComponentes):
             ])
         else:
             print(mensaje)
+
+    def actualizar_contador_guardadas(self):
+        """Consulta la base de datos y actualiza el número en el botón."""
+        pendientes = obtener_ventas_pendientes()
+        self.btn_ver_guardadas.configure(text=f"Ver Ventas Guardadas ({len(pendientes)})")
 
     # --- DESHABILITADOR DE ATAJOS ---
     def destroy(self):

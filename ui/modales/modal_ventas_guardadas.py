@@ -22,13 +22,15 @@ class ModalConfirmacionEliminarVenta:
 
 
 class ModalVentasGuardadas:
-    def __init__(self, master, ventas_pendientes, callback_recuperar, callback_eliminar):
+    def __init__(self, master, ventas_pendientes, callback_recuperar=None, callback_eliminar=None):
         self.master = master
         self.modal = nuevo_modal(master, "Ventas Guardadas", 600, 750)
         
         self.ventas_pendientes = ventas_pendientes
         self.callback_recuperar = callback_recuperar
         self.callback_eliminar = callback_eliminar
+        
+        self.solo_lectura = (callback_recuperar is None and callback_eliminar is None)
 
         frame_modal = nuevo_frame(self.modal)
         frame_modal.pack(expand=True, fill="both", padx=20, pady=20)
@@ -46,22 +48,21 @@ class ModalVentasGuardadas:
         self.frame_lista.pack(expand=True, fill="both", pady=10)
 
         self.var_eliminar = ctk.BooleanVar(value=False)
-        self.switch_eliminar = ctk.CTkSwitch(
-            frame_modal, 
-            text="Modo Eliminación (Borrar Pedidos)",
-            command=self.redibujar_lista,
-            variable=self.var_eliminar,
-            font=("Arial", 12, "bold"),
-            progress_color=COLOR_FALLO
-        )
-        self.switch_eliminar.pack(pady=10)
+        
+        if not self.solo_lectura:
+            self.switch_eliminar = ctk.CTkSwitch(
+                frame_modal, 
+                text="Modo Eliminación (Borrar Pedidos)",
+                command=self.redibujar_lista,
+                variable=self.var_eliminar,
+                font=("Arial", 12, "bold"),
+                progress_color=COLOR_FALLO
+            )
+            self.switch_eliminar.pack(pady=10)
+        else:
+            nuevo_label(frame_modal, "Modo Consulta (Solo Lectura)", fuente=("Arial", 12, "bold"), color_texto="#d4ac0d").pack(pady=10)
 
         self.redibujar_lista()
-
-        # Botón rojo coherente
-        btn_cerrar = nuevo_boton(frame_modal, "Cerrar (Esc)", comando=self.cerrar_modal, color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER)
-        btn_cerrar.pack(side="bottom", pady=10)
-        self.modal.bind("<Escape>", lambda e: self.cerrar_modal())
 
     def cerrar_modal(self):
         self.master.focus()
@@ -95,10 +96,13 @@ class ModalVentasGuardadas:
         f_controles = nuevo_frame(f_item, color_fondo="transparent")
         f_controles.grid(row=0, column=3, sticky="e", padx=5, pady=5)
 
-        if self.var_eliminar.get():
-            nuevo_boton(f_controles, "X", comando=lambda v=venta: self.confirmar_eliminacion(v), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER, ancho=40).pack(side="right", padx=2)
+        if not self.solo_lectura:
+            if self.var_eliminar.get():
+                nuevo_boton(f_controles, "X", comando=lambda v=venta: self.confirmar_eliminacion(v), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER, ancho=40).pack(side="right", padx=2)
+            else:
+                nuevo_boton(f_controles, "Recuperar", comando=lambda v=venta: [self.cerrar_modal(), self.callback_recuperar(v)], color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER, ancho=90).pack(side="right", padx=2)
         else:
-            nuevo_boton(f_controles, "Recuperar", comando=lambda v=venta: [self.cerrar_modal(), self.callback_recuperar(v)], color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER, ancho=90).pack(side="right", padx=2)
+            nuevo_label(f_controles, "En espera...", color_texto="#a0a0a0").pack(side="right", padx=10)
 
     def confirmar_eliminacion(self, venta):
         ModalConfirmacionEliminarVenta(self.modal, venta['cliente'], lambda: self.ejecutar_eliminacion(venta))

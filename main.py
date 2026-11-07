@@ -46,7 +46,7 @@ sys.excepthook = capturar_error_fatal
 def iniciar_app():
     inicializar_base_datos()
     
-    ctk.set_appearance_mode("System")
+    ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
     
     app = VentanaPrincipal()

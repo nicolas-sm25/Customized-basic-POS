@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from ui.componentes.creador_componentes import *
 from bll.gestor_caja import obtener_resumen_caja
+from bll.gestor_ventas import obtener_ventas_pendientes
 
 class ModalCierre:
     def __init__(self, master, caja_id, callback_confirmar):
@@ -46,6 +47,15 @@ class ModalCierre:
         
         self.efectivo_esperado = resumen['efectivo_esperado']
         self.crear_fila_stat(f_flujo, "Efectivo Esperado en Caja:", f"${int(self.efectivo_esperado):,}".replace(",", "."), "#d4ac0d", bold=True)
+        
+        # --- ALERTA DE PEDIDOS EN ESPERA ---
+        ventas_guardadas = obtener_ventas_pendientes()
+        cantidad_guardadas = len(ventas_guardadas)
+
+        if cantidad_guardadas > 0:
+            nuevo_label(frame_modal, f"⚠️ Tienes {cantidad_guardadas} pedido(s) guardados.", fuente=("Arial", 12, "bold"), color_texto="#d4ac0d").pack(pady=(5, 0))
+        else:
+            nuevo_label(frame_modal, "No hay pedidos pendientes.", fuente=("Arial", 11), color_texto="#a0a0a0").pack(pady=(5, 0))
         
         nuevo_label(frame_modal, "Ingrese el efectivo físico contado:", fuente=("Arial", 12, "bold")).pack(pady=(15, 5))
         self.entry_fisico = nueva_caja_texto(frame_modal, placeholder="Monto total contado")
