@@ -12,13 +12,19 @@ else:
 
 # Ruta hacia 'datos'
 CARPETA_DATOS = os.path.join(BASE_DIR, "datos")
+CARPETA_CONFIG = os.path.join(CARPETA_DATOS, "configuraciones")
+CARPETA_IMAGENES = os.path.join(CARPETA_DATOS, "imagenes")
 
 # Carpeta exista junto al .exe o al script
 if not os.path.exists(CARPETA_DATOS):
     os.makedirs(CARPETA_DATOS)
 
+os.makedirs(CARPETA_CONFIG, exist_ok=True)
+os.makedirs(CARPETA_IMAGENES, exist_ok=True)
+
+
 # Ruta absoluta del archivo de la base de datos
-RUTA_DB = os.path.join(CARPETA_DATOS, "productos_DB.db")
+RUTA_DB = os.path.join(CARPETA_CONFIG, "base_datos_tienda.db")
 
 # Conexión a SQLite
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{RUTA_DB}"

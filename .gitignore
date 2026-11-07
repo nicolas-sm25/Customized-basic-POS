@@ -45,7 +45,9 @@ dist/
 Thumbs.db
 
 # ==========================================
-# Archivo de errores de la aplicación
+# Archivos de configuración de la aplicación
 # ==========================================
 *.log
-errores_sistema.log
+*.json
+*.png
+*.ico

@@ -1,14 +1,20 @@
+import json
+import os
+import shutil
+from tkinter import filedialog
 import customtkinter as ctk
 from ui.componentes.configuracion_componentes import ConfiguracionComponentes
 from ui.componentes.creador_componentes import *
-from dal.conexion_DB import SessionLocal
-from dal.modelos.usuarios import Usuario
 from ui.modales.modal_usuarios import ModalUsuarios
+from dal.conexion_DB import SessionLocal, CARPETA_CONFIG, CARPETA_IMAGENES
+from dal.modelos.usuarios import Usuario
 
 class VistaConfiguracion(ConfiguracionComponentes):
     def __init__(self, master, callback_cerrar_sesion):
         super().__init__(master)
         self.callback_cerrar_sesion = callback_cerrar_sesion
+
+        self.config_path = os.path.join(CARPETA_CONFIG, "config.json")
 
         # --- TÍTULO ---
         self.lbl_titulo = nuevo_label(self, "Configuración del Sistema", fuente=FUENTE_TITULOS)
@@ -21,25 +27,25 @@ class VistaConfiguracion(ConfiguracionComponentes):
         f_contenido = ctk.CTkScrollableFrame(self.frame_container, fg_color="transparent")
         f_contenido.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # --- SECCIÓN: APARIENCIA ---
-        nuevo_label(f_contenido, "Apariencia de la Interfaz", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(0, 10))
-        
-        f_tema = nuevo_frame(f_contenido, color_fondo="#2b2b2b")
-        f_tema.pack(fill="x", pady=5, padx=5)
-        
-        nuevo_label(f_tema, "Tema visual:", fuente=("Arial", 13), poscicion="w").pack(side="left", padx=15, pady=15)
-        
-        self.combo_tema = ctk.CTkOptionMenu(
-            f_tema, 
-            values=["Dark", "Light", "System"],
-            command=self.cambiar_tema,
-            fg_color="#3b3b3b",
-            button_color="#4b4b4b",
-            button_hover_color="#5b5b5b",
-            width=140
-        )
-        self.combo_tema.pack(side="right", padx=15, pady=15)
-        self.combo_tema.set(ctk.get_appearance_mode())
+        # --- SECCIÓN: CUENTA Y SESIÓN ---
+        nuevo_label(f_contenido, "Control de Sesión", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(25, 10))
+
+        f_sesion = nuevo_frame(f_contenido, color_fondo="#2b2b2b")
+        f_sesion.pack(fill="x", pady=5, padx=5)
+
+        f_info_sesion = nuevo_frame(f_sesion, color_fondo="transparent")
+        f_info_sesion.pack(side="left", padx=15, pady=15)
+        nuevo_label(f_info_sesion, "Cerrar sesión actual", fuente=("Arial", 13, "bold"), poscicion="w").pack(anchor="w")
+        nuevo_label(f_info_sesion, "Volverás a la pantalla de inicio de sesión.", fuente=("Arial", 11), color_texto="#a0a0a0", poscicion="w").pack(anchor="w")
+
+        nuevo_boton(
+            f_sesion, 
+            "Cerrar Sesión", 
+            comando=self.callback_cerrar_sesion, 
+            color_fondo=COLOR_FALLO, 
+            color_hover=COLOR_FALLO_HOVER,
+            ancho=140
+        ).pack(side="right", padx=15, pady=15)
 
         # --- SECCIÓN: CREAR USUARIO NUEVO ---
         rol_usuario = self.winfo_toplevel().usuario_actual['rol']
@@ -87,25 +93,67 @@ class VistaConfiguracion(ConfiguracionComponentes):
         else:
             nuevo_label(f_crear, "🔒 Acceso restringido.\nSolo los administradores pueden crear o ver usuarios.", fuente=("Arial", 13), color_texto=COLOR_FALLO).pack(pady=30)
 
-        # --- SECCIÓN: CUENTA Y SESIÓN ---
-        nuevo_label(f_contenido, "Control de Sesión", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(25, 10))
+        # --- SECCIÓN: PERSONALIZACIÓN DE TIENDA ---
+        nuevo_label(f_contenido, "Personalización de la Tienda", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(25, 10))
         
-        f_sesion = nuevo_frame(f_contenido, color_fondo="#2b2b2b")
-        f_sesion.pack(fill="x", pady=5, padx=5)
-        
-        f_info_sesion = nuevo_frame(f_sesion, color_fondo="transparent")
-        f_info_sesion.pack(side="left", padx=15, pady=15)
-        nuevo_label(f_info_sesion, "Cerrar sesión actual", fuente=("Arial", 13, "bold"), poscicion="w").pack(anchor="w")
-        nuevo_label(f_info_sesion, "Volverás a la pantalla de inicio de sesión.", fuente=("Arial", 11), color_texto="#a0a0a0", poscicion="w").pack(anchor="w")
+        f_tienda = nuevo_frame(f_contenido, color_fondo="#2b2b2b")
+        f_tienda.pack(fill="x", pady=5, padx=5)
 
-        nuevo_boton(
-            f_sesion, 
-            "Cerrar Sesión", 
-            comando=self.callback_cerrar_sesion, 
-            color_fondo=COLOR_FALLO, 
-            color_hover=COLOR_FALLO_HOVER,
-            ancho=140
-        ).pack(side="right", padx=15, pady=15)
+        if rol_usuario == "Administrador":
+            
+            # Cambiar Nombre
+            f_nombre = nuevo_frame(f_tienda, color_fondo="transparent")
+            f_nombre.pack(fill="x", pady=10)
+            nuevo_label(f_nombre, "Nombre de la Tienda:", fuente=("Arial", 13), poscicion="w").pack(side="left", padx=15)
+            
+            self.entry_nombre_tienda = nueva_caja_texto(f_nombre, placeholder="Ej: Mi Tienda")
+            self.entry_nombre_tienda.pack(side="left", padx=10, fill="x", expand=True)
+            nombre_actual = self.winfo_toplevel().nombre_tienda_actual
+            self.entry_nombre_tienda.insert(0, nombre_actual)
+            
+            btn_guardar_nombre = nuevo_boton(f_nombre, "Actualizar", comando=self.guardar_nombre_tienda, ancho=100)
+            btn_guardar_nombre.pack(side="right", padx=15)
+            
+            # --- IMPORTAR IMÁGENES MEDIANTE INTERFAZ ---
+            f_logo = nuevo_frame(f_tienda, color_fondo="#1c1c1c", radio_esquinas=8)
+            f_logo.pack(pady=15, padx=30, fill="none")
+
+            nuevo_label(
+                f_logo, 
+                "Identidad Visual (Requiere reiniciar el programa para aplicar los cambios):", 
+                fuente=("Arial", 12, "bold"), 
+                color_texto="#a0a0a0", 
+                poscicion="w"
+            ).pack(anchor="w", padx=15, pady=(12, 8))
+
+            f_botones_img = nuevo_frame(f_logo, color_fondo="transparent")
+            f_botones_img.pack(pady=(0, 12), padx=15)
+
+            btn_importar_icono = nuevo_boton(
+                f_botones_img, 
+                "Importar Ícono (.ico)", 
+                comando=self.importar_icono, 
+                color_fondo="#3498db", 
+                color_hover="#2980b9",
+                ancho=160
+            )
+            btn_importar_icono.pack(side="left", padx=8)
+
+            btn_importar_logo = nuevo_boton(
+                f_botones_img, 
+                "Importar Logo Menú (.png)", 
+                comando=self.importar_logo, 
+                color_fondo="#5e17eb", 
+                color_hover="#4a11c0",
+                ancho=180
+            )
+            btn_importar_logo.pack(side="left", padx=8)
+
+            self.lbl_mensaje_img = nuevo_label(f_logo, "", color_texto=COLOR_EXITO)
+            self.lbl_mensaje_img.pack(pady=(0, 8))
+
+        else:
+            nuevo_label(f_tienda, "🔒 Acceso restringido.\nSolo los administradores pueden editar nombre y logo.", fuente=("Arial", 13), color_texto=COLOR_FALLO).pack(pady=30)
 
     def cambiar_tema(self, nuevo_modo):
         ctk.set_appearance_mode(nuevo_modo)
@@ -140,3 +188,58 @@ class VistaConfiguracion(ConfiguracionComponentes):
             self.lbl_mensaje_usuario.configure(text=f"Error al registrar: {str(e)}", text_color=COLOR_FALLO)
         finally:
             sesion.close()
+
+    def guardar_nombre_tienda(self):
+        nuevo_nombre = self.entry_nombre_tienda.get().strip()
+        if not nuevo_nombre: return
+        
+        cfg = {}
+        if os.path.exists(self.config_path):
+            with open(self.config_path, 'r') as f:
+                try: cfg = json.load(f)
+                except: pass
+        
+        cfg["nombre_tienda"] = nuevo_nombre
+        
+        with open(self.config_path, 'w') as f:
+            json.dump(cfg, f)
+
+        ventana = self.winfo_toplevel()
+        ventana.title(nuevo_nombre)
+        ventana.nombre_tienda_actual = nuevo_nombre
+        if hasattr(ventana, 'lbl_nombre_tienda'):
+            ventana.lbl_nombre_tienda.configure(text=nuevo_nombre)
+
+        self.entry_nombre_tienda.configure(text_color=COLOR_EXITO)
+        self.after(2000, lambda: self.entry_nombre_tienda.configure(text_color="white"))
+
+    def importar_icono(self):
+        ruta_origen = filedialog.askopenfilename(
+            title="Seleccionar Ícono de la Ventana",
+            filetypes=[("Archivos de Ícono", "*.ico")]
+        )
+        if ruta_origen:
+            self.guardar_imagen_en_datos(ruta_origen, ".ico", "Ícono")
+
+    def importar_logo(self):
+        ruta_origen = filedialog.askopenfilename(
+            title="Seleccionar Logo del Menú",
+            filetypes=[("Imágenes PNG", "*.png")]
+        )
+        if ruta_origen:
+            self.guardar_imagen_en_datos(ruta_origen, ".png", "Logo")
+
+    def guardar_imagen_en_datos(self, ruta_origen, extension, tipo):
+        try:
+            for archivo in os.listdir(CARPETA_IMAGENES):
+                if archivo.lower().endswith(extension):
+                    os.remove(os.path.join(CARPETA_IMAGENES, archivo))
+
+            nombre_archivo = os.path.basename(ruta_origen)
+            ruta_destino = os.path.join(CARPETA_IMAGENES, nombre_archivo)
+            shutil.copy2(ruta_origen, ruta_destino)
+            
+            self.lbl_mensaje_img.configure(text=f"¡{tipo} importado con éxito!", text_color=COLOR_EXITO)
+            self.after(3000, lambda: self.lbl_mensaje_img.configure(text=""))
+        except Exception as e:
+            self.lbl_mensaje_img.configure(text=f"Error al importar: {e}", text_color=COLOR_FALLO)
