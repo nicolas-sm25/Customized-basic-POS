@@ -21,7 +21,7 @@ if getattr(sys, 'frozen', False):
 else:
     dir_base = os.path.dirname(os.path.abspath(__file__))
 
-log_path = os.path.join(dir_base, "errores_sistema.log")
+log_path = os.path.join(CARPETA_CONFIG, "errores_sistema.log")
 
 logging.basicConfig(
     filename=log_path, 

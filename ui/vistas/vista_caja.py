@@ -157,12 +157,12 @@ class VistaCaja(ConfiguracionComponentes):
         self.btn_guardar = nuevo_boton(
             frame_acciones, 
             "Guardar Venta (F11)", 
-            comando=self.abrir_modal_espera,
+            comando=self.abrir_modal_guardar,
             color_fondo="#d4ac0d", 
             color_hover="#b9770e"
         )
         self.btn_guardar.pack(fill="x", padx=15, pady=3, ipady=3)
-        self.winfo_toplevel().bind("<F11>", lambda event: self.abrir_modal_espera())
+        self.winfo_toplevel().bind("<F11>", lambda event: self.abrir_modal_guardar())
         
         self.btn_ver_guardadas = nuevo_boton(
             frame_acciones, 
@@ -195,6 +195,10 @@ class VistaCaja(ConfiguracionComponentes):
         # --- INICIALIZACIÓN CARRITO ---
         self.panel_carrito = PanelCarrito(self.frame_carrito, self.lbl_valor_total, self.entry_buscar_prod)
         self.panel_carrito.btn_ver_guardadas = self.btn_ver_guardadas
+        ventana_ppal = self.winfo_toplevel()
+        if hasattr(ventana_ppal, 'carrito_guardado') and ventana_ppal.carrito_guardado:
+            self.panel_carrito.items = list(ventana_ppal.carrito_guardado)
+            ventana_ppal.carrito_guardado = []
         self.panel_carrito.actualizar_ui()
         
         # --- INICIALIZACIÓN GESTOR DEL MINI RECIBO ---
@@ -215,16 +219,16 @@ class VistaCaja(ConfiguracionComponentes):
         ModalCobro(self, total_actual, self.procesar_cobro)
 
     # --- POP-UP GUARDAR ---
-    def abrir_modal_espera(self):
-        """Abre el modal personalizado para guardar ventas fiadas."""
+    def abrir_modal_guardar(self):
+        """Abre el modal personalizado para guardar ventas pendientes"""
         if not hasattr(self, 'panel_carrito') or not self.panel_carrito.items:
             self.lbl_valor_total.configure(text="¡Vacío!", text_color=COLOR_FALLO)
             self.after(1500, lambda: self.lbl_valor_total.configure(text="$0", text_color=COLOR_EXITO))
             return
         
-        ModalGuardar(self, self.procesar_espera)
+        ModalGuardar(self, self.procesar_guardar)
 
-    def procesar_espera(self, referencia, modal_referencia):
+    def procesar_guardar(self, referencia, modal_referencia):
         """Envía los datos al BLL y muestra el éxito en la UI."""
         exito, mensaje = registrar_venta(
             carrito=self.panel_carrito.items,
@@ -236,6 +240,8 @@ class VistaCaja(ConfiguracionComponentes):
 
         if exito:
             self.panel_carrito.vaciar()
+            if hasattr(self.winfo_toplevel(), 'carrito_guardado'):
+                self.winfo_toplevel().carrito_guardado = []
             modal_referencia.cerrar_modal()
             self.actualizar_contador_guardadas()
             
@@ -388,6 +394,8 @@ class VistaCaja(ConfiguracionComponentes):
             )
 
             self.panel_carrito.vaciar()
+            if hasattr(self.winfo_toplevel(), 'carrito_guardado'):
+                self.winfo_toplevel().carrito_guardado = []
             modal_referencia.cerrar_modal()
             
             if hasattr(self, 'cliente_actual'):

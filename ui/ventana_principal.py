@@ -23,14 +23,16 @@ from bll.gestor_caja import obtener_caja_abierta
 class VentanaPrincipal(ctk.CTk):
     def __init__(self, nombre_tienda= "TIENDA"):
         super().__init__()
-        
+
         self.title(nombre_tienda)
         self.nombre_tienda_actual = nombre_tienda
         self.geometry("950x650")
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
-        
+
         self.usuario_actual = None
+
+        self.carrito_guardado = []
 
         # --- INTERCEPCIÓN DEL CIERRE DE WINDOWS ---
         self.protocol("WM_DELETE_WINDOW", self.intentar_cerrar_app)
@@ -38,7 +40,7 @@ class VentanaPrincipal(ctk.CTk):
         # --- MENÚ LATERAL (Oculto inicialmente hasta loguearse) ---
         self.frame_menu = nuevo_frame(self, color_fondo=None, radio_esquinas=0, ancho=200)
         self.frame_menu.grid(row=0, column=0, sticky="nsew")
-        
+
         self.frame_contenido = nuevo_frame(self)
         self.frame_contenido.grid(row=0, column=1, sticky="nsew")
         self.vista_actual = None 
@@ -112,8 +114,13 @@ class VentanaPrincipal(ctk.CTk):
         self.btn_config.grid(row=8, column=0, padx=20, pady=15)
 
     def cambiar_vista(self, nueva_vista_clase):
+
+        if self.vista_actual and isinstance(self.vista_actual, VistaCaja) and hasattr(self.vista_actual, 'panel_carrito'):
+            self.carrito_guardado = list(self.vista_actual.panel_carrito.items)
+
         if self.vista_actual:
             self.vista_actual.destroy()
+            
         self.vista_actual = nueva_vista_clase(self.frame_contenido)
         self.vista_actual.pack(fill="both", expand=True, padx=20, pady=20)
 
