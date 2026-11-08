@@ -186,7 +186,8 @@ class VistaInventario(ConfiguracionComponentes):
                 color_paq = COLOR_FALLO if prod['unidad_inactiva'] else "#888888"
                 nuevo_label(f_nombre_paq, texto_paq, fuente=("Arial", 11, "italic"), color_texto=color_paq, poscicion="w").pack(side="left", padx=(5,0), pady=(3,0))
 
-            nuevo_label(f_item, f"${int(prod['costo']):,}".replace(",", "."), fuente=("Arial", 16), color_texto="#cccccc").grid(row=0, column=1, sticky="e", pady=10)
+            color_costo = "#d4ac0d" if prod['costo'] == 0 else "#cccccc"
+            nuevo_label(f_item, f"${int(prod['costo']):,}".replace(",", "."), fuente=("Arial", 16, "bold" if prod['costo'] == 0 else "normal"), color_texto=color_costo).grid(row=0, column=1, sticky="e", pady=10)
             nuevo_label(f_item, f"${int(prod['precio_venta']):,}".replace(",", "."), fuente=("Arial", 16, "bold"), color_texto=COLOR_EXITO).grid(row=0, column=2, sticky="e", pady=10)
             
             color_stock = COLOR_FALLO if prod['stock'] <= 0 else "#ffffff"
@@ -200,8 +201,24 @@ class VistaInventario(ConfiguracionComponentes):
             nuevo_boton(frame_btn, "Editar", comando=lambda c=criterio_busqueda: self.winfo_toplevel().mostrar_editar(c), color_fondo="#3498db", color_hover="#2980b9", ancho=65).pack(side="left", padx=5, expand=True)
             nuevo_boton(frame_btn, "Deshabilitar", comando=lambda id=prod['id'], n=prod['nombre']: self.confirmar_cambio_estado(id, n, False), color_fondo="#961605", color_hover="#631106", ancho=90).pack(side="right", padx=5, expand=True)
 
+        # --- ALERTA DE STOCK NEGATIVO Y COSTO CERO ---
+        alertas = []
         if any(p['stock'] < 0 for p in productos_activos):
-            self.lbl_alerta_stock = nuevo_label(self.frame_tabla_container, "⚠️ ¡ALERTA! Existen productos con stock en negativo. Se requiere registrar reabastecimiento urgente.", color_texto=COLOR_FALLO, fuente=("Arial", 13, "bold"))
+            alertas.append("⚠️ Existen productos con stock en negativo.")
+            
+        if any(p['costo'] == 0 for p in productos_activos):
+            alertas.append("⚠️ Existen productos con costo $0 (Revisar si es correcto).")
+            
+        if alertas:
+
+            texto_alerta = " | ".join(alertas)
+
+            if "⚠️ Existen productos con stock en negativo." in alertas: 
+                color_texto_parcial = COLOR_FALLO 
+            else: 
+                color_texto_parcial = "#d4ac0d"
+
+            self.lbl_alerta_stock = nuevo_label(self.frame_tabla_container, texto_alerta, color_texto=color_texto_parcial, fuente=("Arial", 13, "bold"))
             self.lbl_alerta_stock.pack(pady=5)
 
     # --- POP-UPS ---

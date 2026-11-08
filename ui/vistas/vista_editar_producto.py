@@ -177,6 +177,18 @@ class VistaEditarProducto(ConfiguracionComponentes):
             precio = float(precio_str) if precio_str else 0
             stock = int(stock_str) if stock_str else 0
 
+            if costo < 0 or precio < 0 or stock < 0:
+                self.lbl_mensaje.configure(text="Los valores numéricos (Precio/Stock) no pueden ser negativos.", text_color=COLOR_FALLO)
+                return
+
+            if precio == 0:
+                self.lbl_mensaje.configure(text="El precio de venta no puede ser $0.", text_color=COLOR_FALLO)
+                return
+
+            if costo >= precio:
+                self.lbl_mensaje.configure(text="El costo no puede ser mayor o igual que el precio de venta.", text_color=COLOR_FALLO)
+                return
+
             rol_usuario = self.winfo_toplevel().usuario_actual['rol']
 
             if rol_usuario == "Vendedor":
@@ -189,7 +201,8 @@ class VistaEditarProducto(ConfiguracionComponentes):
             )
 
             if exito:
-                self.reiniciar_pantalla("Cambios guardados exitosamente.", COLOR_EXITO)
+                msj = "Cambios guardados." if costo > 0 else "Advertencia: Producto guardado con costo $0."
+                self.reiniciar_pantalla(msj, "#d4ac0d" if costo == 0 else COLOR_EXITO)
             else:
                 self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 

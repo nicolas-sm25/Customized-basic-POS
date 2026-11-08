@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from bll.gestor_productos import agregar_producto, obtener_productos_unitarios
+from ui.vistas.secciones.panel_autocompletado import PanelAutocompletado
 from ui.componentes.configuracion_componentes import ConfiguracionComponentes
 from ui.componentes.creador_componentes import *
 
@@ -64,23 +65,15 @@ class VistaAgregarProducto(ConfiguracionComponentes):
 
         nuevo_label(
             self.frame_relacional, 
-            "Seleccione el producto a relacionar:", 
+            "Busque y seleccione el producto base:", 
             fuente=("Arial", 13, "bold"), 
             color_texto="#ffffff"
         ).pack(pady=(12, 5), padx=20)
 
-        self.productos_base = obtener_productos_unitarios()
-        nombres_base = ["-- Seleccione un producto --"] + [p["nombre"] for p in self.productos_base] if self.productos_base else ["No hay productos base"]
-        
-        self.combo_base = ctk.CTkOptionMenu(
-            self.frame_relacional, 
-            values=nombres_base,
-            fg_color="#3b3b3b",
-            button_color="#4b4b4b",
-            button_hover_color="#5b5b5b"
-        )
-        self.combo_base.pack(pady=5, padx=20)
-        self.combo_base.set("-- Seleccione un producto --")
+        self.entry_base_buscar = nueva_caja_texto(self.frame_relacional, placeholder="Ej: Coca Cola...")
+        self.entry_base_buscar.pack(pady=5, padx=20, fill="x")
+
+        self.id_producto_base_seleccionado = None
 
         nuevo_label(
             self.frame_relacional, 
@@ -91,6 +84,8 @@ class VistaAgregarProducto(ConfiguracionComponentes):
 
         self.entry_cant_paquete = nueva_caja_texto(self.frame_relacional, placeholder="Ej: 30")
         self.entry_cant_paquete.pack(pady=(2, 15), padx=20)
+
+        self.autocompletado_relacional = PanelAutocompletado(self.entry_base_buscar, self.frame_relacional, self.entry_cant_paquete, self.resultado_autocompletado_base)
 
         # --- BOTONES ---
         self.frame_botones = nuevo_frame(self.frame_central)
@@ -112,16 +107,23 @@ class VistaAgregarProducto(ConfiguracionComponentes):
             self.entry_precio, self.entry_stock, self.entry_cant_paquete
         ]
 
+    def resultado_autocompletado_base(self, producto):
+        """Se activa cuando seleccionan un producto base del menú flotante."""
+        self.id_producto_base_seleccionado = producto['id']
+        self.entry_base_buscar.delete(0, 'end')
+        self.entry_base_buscar.insert(0, producto['nombre'])
+
+        self.entry_base_buscar.configure(state="disabled", fg_color="#1a1a1a", text_color=COLOR_EXITO)
+        self.entry_cant_paquete.focus()
+
     # --- LÓGICA DEL PANEL RELACIONAL ---
     def alternar_paquete(self):
-        """Muestra u oculta el panel de configuración de paquetes limpiamente."""
         if self.var_paquete.get():
             self.frame_relacional.pack(fill="x", pady=5, padx=20, before=self.frame_botones)
 
-            self.productos_base = obtener_productos_unitarios()
-            nombres_base = ["-- Seleccione un producto --"] + ([p["nombre"] for p in self.productos_base] if self.productos_base else [])
-            self.combo_base.configure(values=nombres_base)
-            self.combo_base.set("-- Seleccione un producto --")
+            self.id_producto_base_seleccionado = None
+            self.entry_base_buscar.configure(state="normal", fg_color="#343638", text_color="#ffffff")
+            self.entry_base_buscar.delete(0, 'end')
 
             self.entry_stock.configure(state="normal", fg_color="#343638", text_color="#ffffff")
             self.entry_stock.delete(0, 'end')
@@ -152,27 +154,27 @@ class VistaAgregarProducto(ConfiguracionComponentes):
             stock = int(stock_str) if stock_str else 0
             codigo = codigo if codigo else None
 
-            if costo < 0 or precio <= 0 or stock < 0:
+            if costo < 0 or precio < 0 or stock < 0:
                 self.lbl_mensaje.configure(text="Los valores numéricos no pueden ser negativos.", text_color="red")
                 return
             
-            if costo > precio:
-                self.lbl_mensaje.configure(text="El costo no puede ser mayor que el precio de venta.", text_color="red")
+            if precio == 0:
+                self.lbl_mensaje.configure(text="El precio de venta no puede ser $0.", text_color="red")
+                return
+
+            if costo >= precio:
+                self.lbl_mensaje.configure(text="El costo no puede ser mayor o igual que el precio de venta.", text_color="red")
                 return
 
             producto_base_id = None
             cantidad_por_paquete = 1
 
             if es_paquete:
-                nombre_seleccionado = self.combo_base.get()
-                if nombre_seleccionado == "-- Seleccione un producto --" or not nombre_seleccionado:
-                    self.lbl_mensaje.configure(text="Debe seleccionar un producto base válido", text_color="red")
+                if not getattr(self, 'id_producto_base_seleccionado', None):
+                    self.lbl_mensaje.configure(text="Debe buscar y seleccionar un producto base válido.", text_color="red")
                     return
-                    
-                for p in self.productos_base:
-                    if p["nombre"] == nombre_seleccionado:
-                        producto_base_id = p["id"]
-                        break
+
+                producto_base_id = self.id_producto_base_seleccionado
                 
                 try:
                     cantidad_por_paquete = int(self.entry_cant_paquete.get().replace(".", "").strip())
@@ -200,6 +202,8 @@ class VistaAgregarProducto(ConfiguracionComponentes):
 
             if exito:
                 self.lbl_mensaje.configure(text=mensaje, text_color="green")
+                if costo == 0:
+                    self.lbl_mensaje.configure(text="Advertencia: Producto guardado con costo $0.", text_color="#d4ac0d")
                 self.limpiar_campos()
                 self.var_paquete.set(False)
                 self.alternar_paquete()
