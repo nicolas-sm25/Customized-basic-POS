@@ -10,25 +10,33 @@ class PanelCarrito:
         self.items = []
 
     def agregar_producto(self, producto, cantidad=1):
-        """Añade un producto a la lista o suma la cantidad si ya existe."""
-        for item in self.items:
+        """Añade un producto al carrito o aumenta su cantidad."""
+
+        for index, item in enumerate(self.items):
             if item["id"] == producto["id"] and not item.get("recuperado"):
+
                 item["cantidad"] += cantidad
                 item["subtotal"] = item["cantidad"] * item["precio_venta"]
-                break
-        else:
-            self.items.append({
-                "id": producto["id"],
-                "nombre": producto["nombre"],
-                "precio_venta": producto["precio_venta"],
-                "costo": producto["costo"],
-                "cantidad": cantidad,
-                "subtotal": cantidad * producto["precio_venta"]
-            })
+                self.actualizar_ui()
+                return
+
+        nuevo_item = {
+            "id": producto["id"],
+            "nombre": producto["nombre"],
+            "precio_venta": producto["precio_venta"],
+            "costo": producto["costo"],
+            "cantidad": cantidad,
+            "subtotal": cantidad * producto["precio_venta"]
+        }
+        self.items.append(nuevo_item)
+
         self.actualizar_ui()
 
+
     def actualizar_ui(self):
-        """Redibuja la lista de productos como una tabla y actualiza el label del total."""
+        """Redibuja la lista de productos y actualiza el total global."""
+        
+        # Limpiar frame
         for widget in self.frame_carrito.winfo_children():
             widget.destroy()
 
@@ -44,11 +52,10 @@ class PanelCarrito:
             self.lbl_total.configure(text="$0")
             return
 
-        # --- CABECERA DE LA TABLA DEL CARRITO ---
+        # --- CABECERA DE LA TABLA ---
         f_enc = nuevo_frame(self.frame_carrito, color_fondo="#1a1a1a")
         f_enc.pack(fill="x", pady=(10, 5), padx=10)
         
-        # Proporciones estrictas: Nombre(3), C.U(2), Subt(2), Controles(3)
         f_enc.grid_columnconfigure(0, weight=3, uniform="carr")
         f_enc.grid_columnconfigure(1, weight=2, uniform="carr")
         f_enc.grid_columnconfigure(2, weight=2, uniform="carr")
@@ -81,12 +88,10 @@ class PanelCarrito:
             lbl_subtotal = nuevo_label(frame_item, f"${int(item['subtotal']):,}".replace(",", "."), fuente=("Arial", 16, "bold"), color_texto=COLOR_EXITO)
             lbl_subtotal.grid(row=0, column=2, sticky="e", pady=10)
 
-            # Columna de controles
             frame_controles = nuevo_frame(frame_item, color_fondo="transparent")
             frame_controles.grid(row=0, column=3, sticky="e", padx=10, pady=5)
 
             if item.get("recuperado"):
-
                 texto_bloqueado = f"{item['cantidad']} unid. (Recuperado)"
                 lbl_bloqueado = nuevo_label(frame_controles, texto_bloqueado, color_texto="#d4ac0d", fuente=("Arial", 14, "bold"))
                 lbl_bloqueado.pack(side="right", padx=5)
@@ -101,6 +106,7 @@ class PanelCarrito:
                 entry_cant.configure(width=60, font=("Arial", 16), justify="center")
                 entry_cant.insert(0, str(item['cantidad']))
                 entry_cant.pack(side="right", padx=4)
+
                 entry_cant.bind("<Return>", lambda event, i=index, e=entry_cant: self.actualizar_manual(e, i))
                 entry_cant.bind("<KeyRelease>", lambda event, i=index, e=entry_cant, lbl_s=lbl_subtotal: self.actualizar_manual_silencioso(e, i, lbl_s))
 
@@ -121,6 +127,7 @@ class PanelCarrito:
             self.actualizar_ui()
 
     def actualizar_manual(self, entry, index):
+        """Si el usuario presiona Enter en la caja de texto pequeña, recalcula y devuelve el foco."""
         valor_str = entry.get().strip()
         try:
             nueva_cantidad = int(valor_str)
@@ -133,13 +140,14 @@ class PanelCarrito:
         self.entry_buscador.focus()
 
     def actualizar_manual_silencioso(self, entry, index, lbl_subtotal):
-        """Actualiza totales al instante mientras escribes, sin redibujar toda la UI."""
+        """Actualiza totales al instante mientras escribes, sin redibujar toda la UI ni perder foco."""
         valor_str = entry.get().strip()
         if not valor_str.isdigit():
             return
         
         nueva_cantidad = int(valor_str)
         if nueva_cantidad > 0:
+
             self.items[index]["cantidad"] = nueva_cantidad
             self.items[index]["subtotal"] = nueva_cantidad * self.items[index]["precio_venta"]
 
@@ -148,6 +156,7 @@ class PanelCarrito:
             total = sum(item['subtotal'] for item in self.items)
             self.lbl_total.configure(text=f"${int(total):,}".replace(",", "."))
 
+    # --- CICLO DE VIDA DEL CARRITO ---
     def vaciar(self):
         """Limpia el carrito completamente después de una venta."""
         self.items.clear()
@@ -157,6 +166,5 @@ class PanelCarrito:
         """Reemplaza el carrito actual con una lista recuperada de la base de datos."""
         for item in lista_items:
             item["recuperado"] = True
-
         self.items = lista_items
         self.actualizar_ui()

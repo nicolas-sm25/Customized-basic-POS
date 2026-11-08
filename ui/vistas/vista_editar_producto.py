@@ -1,6 +1,7 @@
 from bll.gestor_productos import buscar_producto_por_codigo, buscar_productos_por_nombre, actualizar_producto
 from ui.componentes.configuracion_componentes import ConfiguracionComponentes
 from ui.componentes.creador_componentes import *
+from ui.vistas.secciones.panel_autocompletado import PanelAutocompletado
 
 class VistaEditarProducto(ConfiguracionComponentes):
     def __init__(self, master):
@@ -28,6 +29,13 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.btn_buscar = nuevo_boton(self.frame_busqueda, "Buscar", comando=self.buscar_producto)
         self.btn_buscar.grid(row=0, column=1, padx=5)
 
+        # --- INFO PRINCIPAL DE PRODUCTOS ---
+        self.frame_edicion = nuevo_frame(self.frame_central)
+        self.frame_edicion.pack(pady=15)
+
+        # --- AUTOCOMPLETADO ---
+        self.autocompletado = PanelAutocompletado(self.entry_busqueda, self.frame_central, self.frame_edicion, self.resultado_autocompletado)
+        
         # --- INFO PRINCIPAL DE PRODUCTOS ---
         self.frame_edicion = nuevo_frame(self.frame_central)
         self.frame_edicion.pack(pady=15)
@@ -74,11 +82,11 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.frame_botones = nuevo_frame(self.frame_central)
         self.frame_botones.pack(pady=10)
 
-        self.btn_guardar = nuevo_boton(self.frame_botones, "Guardar Cambios", comando=self.guardar_cambios, color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER)
+        self.btn_guardar = nuevo_boton(self.frame_botones, "Guardar Cambios (Enter)", comando=self.guardar_cambios, color_fondo=COLOR_EXITO, color_hover=COLOR_EXITO_HOVER)
         self.btn_guardar.grid(row=0, column=0, padx=10)
         self.btn_guardar.configure(state="disabled")
 
-        self.btn_cancelar = nuevo_boton(self.frame_botones, "Cancelar", lambda: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER)
+        self.btn_cancelar = nuevo_boton(self.frame_botones, "Cancelar (ESC)", lambda: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER)
         self.btn_cancelar.grid(row=0, column=1, padx=10)
         self.btn_cancelar.configure(state="disabled")
 
@@ -124,9 +132,13 @@ class VistaEditarProducto(ConfiguracionComponentes):
 
     # --- BÚSQUEDA DE PRODUCTOS EN LA DB ---
     def buscar_producto(self, event=None):
+
+        if self.autocompletado.procesar_enter(): return
+        
         criterio = self.entry_busqueda.get().strip()
         if not criterio:
             return
+
         producto = buscar_producto_por_codigo(criterio)
         if not producto:
             resultados = buscar_productos_por_nombre(criterio)
@@ -200,3 +212,9 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.entry_busqueda.focus()
         
         self.lbl_mensaje.configure(text=mensaje, text_color=color)
+
+    def resultado_autocompletado(self, producto):
+        """Se activa cuando el autocompletado devuelve un producto (vía clic o Enter)."""
+        self.entry_busqueda.delete(0, 'end')
+        self.entry_busqueda.insert(0, producto['codigo_barras'] if producto['codigo_barras'] else producto['nombre'])
+        self.buscar_producto()

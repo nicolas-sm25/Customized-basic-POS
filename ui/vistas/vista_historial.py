@@ -16,23 +16,69 @@ class VistaHistorial(ConfiguracionComponentes):
         self.scroll_tabla = ctk.CTkScrollableFrame(self.frame_tabla_container, fg_color="transparent")
         self.scroll_tabla.pack(fill="both", expand=True, padx=10, pady=10)
 
+        # --- PAGINACIÓN ---
+        self.pagina_actual = 1
+        self.items_por_pagina = 13
+        
+        self.frame_paginacion = nuevo_frame(self.frame_tabla_container, color_fondo="transparent")
+        self.frame_paginacion.pack(fill="x", pady=(0, 10))
+        
+        self.btn_menos_5 = nuevo_boton(self.frame_paginacion, "<< 5 Pags", comando=lambda: self.cambiar_pagina(-5), ancho=90, color_fondo="#1f538d")
+        self.btn_menos_5.pack(side="left", padx=(20, 5))
+        
+        self.btn_menos_1 = nuevo_boton(self.frame_paginacion, "< Anterior", comando=lambda: self.cambiar_pagina(-1), ancho=90, color_fondo="#1f538d")
+        self.btn_menos_1.pack(side="left", padx=5)
+        
+        self.lbl_paginacion = nuevo_label(self.frame_paginacion, "Página 1 / X", fuente=("Arial", 12, "bold"), color_texto="#a0a0a0")
+        self.lbl_paginacion.pack(side="left", expand=True)
+        
+        # Botones Derecha
+        self.btn_mas_5 = nuevo_boton(self.frame_paginacion, "5 Pags >>", comando=lambda: self.cambiar_pagina(5), ancho=90, color_fondo="#1f538d")
+        self.btn_mas_5.pack(side="right", padx=(5, 20))
+        
+        self.btn_mas_1 = nuevo_boton(self.frame_paginacion, "Siguiente >", comando=lambda: self.cambiar_pagina(1), ancho=90, color_fondo="#1f538d")
+        self.btn_mas_1.pack(side="right", padx=5)
+
         self.cargar_historial()
+        
+    def cambiar_pagina(self, salto):
+        nueva_pagina = self.pagina_actual + salto
+        if nueva_pagina < 1: nueva_pagina = 1
+        elif nueva_pagina > getattr(self, 'total_paginas', 1): nueva_pagina = getattr(self, 'total_paginas', 1)
+            
+        if nueva_pagina != self.pagina_actual:
+            self.pagina_actual = nueva_pagina
+            self.cargar_historial()
 
     def cargar_historial(self):
-        for widget in self.scroll_tabla.winfo_children():
-            widget.destroy()
-
+        for widget in self.scroll_tabla.winfo_children(): widget.destroy()
         historial = obtener_historial_cajas()
 
         if not historial:
             nuevo_label(self.scroll_tabla, "No hay historial de cajas registrado.", fuente=("Arial", 16, "bold"), color_texto="#a0a0a0").pack(expand=True, pady=40)
+            self.frame_paginacion.pack_forget()
             return
+            
+        self.frame_paginacion.pack(fill="x", pady=(0, 10))
+
+        # --- PÁGINAS ---
+        self.total_paginas = max(1, (len(historial) + self.items_por_pagina - 1) // self.items_por_pagina)
+        if self.pagina_actual > self.total_paginas: self.pagina_actual = self.total_paginas
+            
+        inicio = (self.pagina_actual - 1) * self.items_por_pagina
+        fin = inicio + self.items_por_pagina
+        historial_pagina = historial[inicio:fin]
+
+        self.lbl_paginacion.configure(text=f"Página {self.pagina_actual} / {self.total_paginas}")
+        self.btn_menos_1.configure(state="normal" if self.pagina_actual > 1 else "disabled")
+        self.btn_menos_5.configure(state="normal" if self.pagina_actual > 1 else "disabled")
+        self.btn_mas_1.configure(state="normal" if self.pagina_actual < self.total_paginas else "disabled")
+        self.btn_mas_5.configure(state="normal" if self.pagina_actual < self.total_paginas else "disabled")
 
         # --- CABECERA DE LA TABLA ---
         f_enc = nuevo_frame(self.scroll_tabla, color_fondo="#1a1a1a")
         f_enc.pack(fill="x", pady=(0, 5), padx=5)
-        
-        # Ahora son 9 columnas.
+
         cols = [2, 2, 2, 2, 2, 2, 2, 2, 2] 
         for i, weight in enumerate(cols):
             f_enc.grid_columnconfigure(i, weight=weight, uniform="hist")
@@ -54,7 +100,7 @@ class VistaHistorial(ConfiguracionComponentes):
             nuevo_label(f_enc, texto, fuente=("Arial", 11, "bold"), color_texto="#a0a0a0", poscicion=alinear).grid(row=0, column=idx, sticky=anclaje, padx=5, pady=8)
 
         # --- FILAS DE DATOS ---
-        for caja in historial:
+        for caja in historial_pagina:
             f_item = nuevo_frame(self.scroll_tabla, color_fondo="#2b2b2b")
             f_item.pack(fill="x", pady=4, padx=5)
             
