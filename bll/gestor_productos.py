@@ -39,9 +39,12 @@ def agregar_producto(nombre, costo, precio_venta, codigo_barras=None, stock=0, e
 def buscar_productos_por_nombre(nombre_parcial):
     sesion = SessionLocal()
     try:
-        # PARCHE: Quitamos el filtro de activo == True para que la UI decida
+        criterio_limpio = nombre_parcial.replace(" ", "")
+
+        criterio_like = "%" + "%".join(list(criterio_limpio)) + "%"
+
         productos = sesion.query(Producto).filter(
-            Producto.nombre.ilike(f"%{nombre_parcial}%")
+            Producto.nombre.ilike(criterio_like)
         ).all()
         
         return [{
@@ -51,7 +54,7 @@ def buscar_productos_por_nombre(nombre_parcial):
             "costo": p.costo,
             "precio_venta": p.precio_venta,
             "stock": p.stock,
-            "activo": p.activo
+            "activo": p.activo 
         } for p in productos]
     except Exception:
         return []

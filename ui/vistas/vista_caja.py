@@ -129,13 +129,24 @@ class VistaCaja(ConfiguracionComponentes):
         frame_inferior.grid(row=2, column=0, sticky="ew", pady=(0, 10))
         
         # --- BÚSQUEDA Y AGREGAR AL CARRITO ---
-        self.entry_buscar_prod = nueva_caja_texto(frame_busqueda, placeholder="Código de Barras o Nombre...")
+        self.entry_buscar_prod = nueva_caja_texto(frame_busqueda, placeholder="Código o Nombre...")
         self.entry_buscar_prod.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        self.entry_buscar_prod.bind("<Return>", self.agregar_al_carrito)
-        self.after(5, self.entry_buscar_prod.focus)
-        
+
         self.btn_agregar = nuevo_boton(frame_busqueda, "Agregar", self.agregar_al_carrito)
         self.btn_agregar.pack(side="right")
+
+        # Eventos de teclado
+        self.entry_buscar_prod.bind("<Return>", self.agregar_al_carrito)
+        self.entry_buscar_prod.bind("<KeyRelease>", self.mostrar_sugerencias)
+        self.entry_buscar_prod.bind("<Up>", self.navegar_arriba)
+        self.entry_buscar_prod.bind("<Down>", self.navegar_abajo)
+        self.after(5, self.entry_buscar_prod.focus)
+
+        # --- PANEL DE AUTOCOMPLETADO ---
+        self.frame_sugerencias = ctk.CTkScrollableFrame(frame_izquierdo, fg_color="#2b2b2b", height=120)
+        self.indice_sugerencia = -1
+        self.botones_sugerencia = []
+        self.sugerencias_actuales = []
 
         # --- TEXTO Y BOTONES PANEL DERECHO ---
         self.lbl_texto_total = nuevo_label(frame_acciones, "Total:", fuente=FUENTE_TITULOS)
@@ -330,40 +341,31 @@ class VistaCaja(ConfiguracionComponentes):
 
     # --- CARRITO DE COMPRAS ---
     def agregar_al_carrito(self, event=None):
-        """Busca el producto y delega la interfaz al GestorCarrito."""
         criterio = self.entry_buscar_prod.get().strip()
-        if not criterio:
+        if not criterio: return
+
+        if hasattr(self, 'indice_sugerencia') and self.indice_sugerencia >= 0 and self.sugerencias_actuales:
+            producto_seleccionado = self.sugerencias_actuales[self.indice_sugerencia]
+            self.agregar_desde_sugerencia(producto_seleccionado)
             return
+
+        self.frame_sugerencias.pack_forget()
+        self.indice_sugerencia = -1
+
+        cantidad = 1
+        if "*" in criterio:
+            partes = criterio.split("*", 1)
+            if partes[0].isdigit():
+                cantidad = int(partes[0])
+                if cantidad <= 0: cantidad = 1
+                criterio = partes[1].strip()
 
         producto = buscar_producto_por_codigo(criterio)
         if not producto:
             resultados = buscar_productos_por_nombre(criterio)
-            if resultados:
-                producto = resultados[0]
+            if resultados: producto = resultados[0]
 
-        if producto:
-            if not producto.get('activo', True):
-                self.entry_buscar_prod.delete(0, 'end')
-                self.focus()
-                self.entry_buscar_prod.configure(placeholder_text="¡Producto inhabilitado!", placeholder_text_color="#d4ac0d")
-                self.after(1500, lambda: [
-                    self.master.focus(), 
-                    self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
-                    self.entry_buscar_prod.focus()
-                ])
-                return
-
-            self.panel_carrito.agregar_producto(producto)
-            self.entry_buscar_prod.delete(0, 'end')
-        else:
-            self.entry_buscar_prod.delete(0, 'end')
-            self.focus()
-            self.entry_buscar_prod.configure(placeholder_text="¡Producto no encontrado!", placeholder_text_color=COLOR_FALLO)
-            self.after(1000, lambda: [
-                self.master.focus(), 
-                self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
-                self.entry_buscar_prod.focus()
-            ])
+        self.procesar_agregado(producto, cantidad)
 
     def procesar_cobro(self, metodo_pago, modal_referencia, entregado=0, vueltas=0):
         """Envía los items guardados en el gestor al BLL y muestra las vueltas."""
@@ -416,6 +418,129 @@ class VistaCaja(ConfiguracionComponentes):
         """Consulta la base de datos y actualiza el número en el botón."""
         pendientes = obtener_ventas_pendientes()
         self.btn_ver_guardadas.configure(text=f"Ver Ventas Guardadas ({len(pendientes)})")
+
+    def navegar_arriba(self, event):
+        self.mover_seleccion(-1)
+        return "break"
+
+    def navegar_abajo(self, event):
+        self.mover_seleccion(1)
+        return "break"
+
+    def mover_seleccion(self, paso):
+        if not hasattr(self, 'botones_sugerencia') or not self.botones_sugerencia: return
+
+        if self.indice_sugerencia >= 0:
+            self.botones_sugerencia[self.indice_sugerencia].configure(fg_color="#3b3b3b")
+            
+        self.indice_sugerencia += paso
+        total_items = len(self.botones_sugerencia)
+
+        if self.indice_sugerencia >= total_items:
+            self.indice_sugerencia = 0
+        elif self.indice_sugerencia < 0:
+            self.indice_sugerencia = total_items - 1
+
+        self.botones_sugerencia[self.indice_sugerencia].configure(fg_color="#87868A")
+
+        try:
+            items_visibles = 6 
+            if total_items > items_visibles:
+                canvas = self.frame_sugerencias._parent_canvas
+                pos_actual = canvas.yview()[0]
+
+                if self.indice_sugerencia < items_visibles:
+                    destino = 0.0
+                else:
+                    destino = (self.indice_sugerencia - (items_visibles - 1)) / (total_items - items_visibles)
+                
+                if hasattr(self, '_anim_scroll_id') and self._anim_scroll_id:
+                    self.after_cancel(self._anim_scroll_id)
+                
+                self._animar_scroll_fluido(canvas, pos_actual, destino, pasos=6, actual=1)
+        except Exception:
+            pass
+
+    def _animar_scroll_fluido(self, canvas, inicio, fin, pasos, actual):
+        """Desliza el panel milimétricamente para evitar la teletransportación."""
+        if actual <= pasos:
+            posicion_interpolada = inicio + (fin - inicio) * (actual / pasos)
+            canvas.yview_moveto(posicion_interpolada)
+            
+            self._anim_scroll_id = self.after(8, lambda: self._animar_scroll_fluido(canvas, inicio, fin, pasos, actual + 1))
+
+    def mostrar_sugerencias(self, event):
+        if event.keysym in ['Up', 'Down', 'Return']: return 
+            
+        criterio = self.entry_buscar_prod.get().strip()
+
+        if "*" in criterio:
+            partes = criterio.split("*", 1)
+            criterio_busqueda = partes[1].strip()
+        else:
+            criterio_busqueda = criterio
+
+        if not criterio_busqueda or criterio_busqueda.isdigit():
+            self.frame_sugerencias.pack_forget()
+            self.indice_sugerencia = -1
+            self.botones_sugerencia = []
+            return
+
+        if len(criterio_busqueda) >= 2:
+            resultados = buscar_productos_por_nombre(criterio_busqueda)
+
+            activos = [p for p in resultados if p.get('activo', True)][:15]
+            
+            if activos:
+                self.frame_sugerencias.pack(fill="x", pady=(0, 10), before=self.frame_carrito)
+                for widget in self.frame_sugerencias.winfo_children(): widget.destroy()
+                
+                self.sugerencias_actuales = activos
+                self.botones_sugerencia = []
+                self.indice_sugerencia = -1
+
+                try:
+                    self.frame_sugerencias._parent_canvas.yview_moveto(0)
+                except Exception:
+                    pass
+                
+                for prod in activos:
+                    texto_btn = f"{prod['nombre']} - ${int(prod['precio_venta']):,}".replace(",", ".")
+                    btn = nuevo_boton(self.frame_sugerencias, texto_btn, comando=lambda p=prod: self.agregar_desde_sugerencia(p), color_fondo="#3b3b3b", color_hover="#555555")
+                    btn.pack(fill="x", pady=2, padx=5)
+                    self.botones_sugerencia.append(btn)
+            else:
+                self.frame_sugerencias.pack_forget()
+                self.botones_sugerencia = []
+                self.indice_sugerencia = -1
+
+    def agregar_desde_sugerencia(self, producto):
+        criterio = self.entry_buscar_prod.get().strip()
+        cantidad = 1
+        if "*" in criterio:
+            partes = criterio.split("*", 1)
+            if partes[0].isdigit():
+                cantidad = int(partes[0])
+                if cantidad <= 0: cantidad = 1
+
+        self.frame_sugerencias.pack_forget()
+        self.indice_sugerencia = -1
+        self.procesar_agregado(producto, cantidad)
+
+    def procesar_agregado(self, producto, cantidad):
+        """Función auxiliar para no repetir código de validación."""
+        if producto:
+            if not producto.get('activo', True):
+                self.entry_buscar_prod.delete(0, 'end')
+                self.entry_buscar_prod.configure(placeholder_text="¡Producto inhabilitado!", placeholder_text_color="#d4ac0d")
+                self.after(1500, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray"), self.entry_buscar_prod.focus()])
+                return
+            self.panel_carrito.agregar_producto(producto, cantidad=cantidad)
+            self.entry_buscar_prod.delete(0, 'end')
+        else:
+            self.entry_buscar_prod.delete(0, 'end')
+            self.entry_buscar_prod.configure(placeholder_text="¡Producto no encontrado!", placeholder_text_color=COLOR_FALLO)
+            self.after(1000, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray"), self.entry_buscar_prod.focus()])
 
     # --- DESHABILITADOR DE ATAJOS ---
     def destroy(self):

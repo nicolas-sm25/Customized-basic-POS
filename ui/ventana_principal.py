@@ -26,7 +26,7 @@ class VentanaPrincipal(ctk.CTk):
 
         self.title(nombre_tienda)
         self.nombre_tienda_actual = nombre_tienda
-        self.geometry("950x650")
+        self.geometry("1000x600")
         self.after(0, lambda: self.state('zoomed'))
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
