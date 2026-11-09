@@ -352,7 +352,8 @@ class VistaCaja(ConfiguracionComponentes):
         producto = buscar_producto_por_codigo(criterio)
         if not producto:
             resultados = buscar_productos_por_nombre(criterio)
-            if resultados: producto = resultados[0]
+            if resultados: 
+                producto = next((p for p in resultados if p['nombre'].lower() == criterio.lower()), resultados[0])
 
         self.procesar_agregado(producto, cantidad)
 

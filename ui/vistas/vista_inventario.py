@@ -10,7 +10,7 @@ from ui.modales.modal_productos_inactivos import ModalProductosInactivos
 class VistaInventario(ConfiguracionComponentes):
     def __init__(self, master):
         super().__init__(master)
-        
+
         self.lbl_titulo = nuevo_label(self, "Inventario General de Productos", fuente=FUENTE_TITULOS)
         self.lbl_titulo.pack(pady=15)
 
@@ -52,7 +52,7 @@ class VistaInventario(ConfiguracionComponentes):
 
         # --- PAGINACIÓN ---
         self.pagina_actual = 1
-        self.items_por_pagina = 13
+        self.items_por_pagina = 12
         
         self.frame_paginacion = nuevo_frame(self.frame_tabla_container, color_fondo="transparent")
         self.frame_paginacion.pack(fill="x", pady=(0, 10))
@@ -79,10 +79,10 @@ class VistaInventario(ConfiguracionComponentes):
     def resultado_autocompletado(self, producto):
         self.entry_busqueda.delete(0, 'end')
         self.entry_busqueda.insert(0, producto['nombre'])
-        self.ejecutar_busqueda()
+        self.ejecutar_busqueda(None)
 
     def ejecutar_busqueda(self, event=None):
-        if self.autocompletado.procesar_enter(): return
+        if self.autocompletado.procesar_enter(): return "break"
         
         criterio = self.entry_busqueda.get().strip().lower().replace(" ", "")
 
@@ -199,7 +199,6 @@ class VistaInventario(ConfiguracionComponentes):
             
             criterio_busqueda = prod.get('codigo_barras') if prod.get('codigo_barras') else prod.get('nombre', '')
             nuevo_boton(frame_btn, "Editar", comando=lambda c=criterio_busqueda: self.winfo_toplevel().mostrar_editar(c), color_fondo="#3498db", color_hover="#2980b9", ancho=65).pack(side="left", padx=5, expand=True)
-            nuevo_boton(frame_btn, "Deshabilitar", comando=lambda id=prod['id'], n=prod['nombre']: self.confirmar_cambio_estado(id, n, False), color_fondo="#961605", color_hover="#631106", ancho=90).pack(side="right", padx=5, expand=True)
 
         # --- ALERTA DE STOCK NEGATIVO Y COSTO CERO ---
         alertas = []

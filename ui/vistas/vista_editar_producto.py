@@ -1,4 +1,4 @@
-from bll.gestor_productos import buscar_producto_por_codigo, buscar_productos_por_nombre, actualizar_producto
+from bll.gestor_productos import *
 from ui.componentes.configuracion_componentes import ConfiguracionComponentes
 from ui.componentes.creador_componentes import *
 from ui.vistas.secciones.panel_autocompletado import PanelAutocompletado
@@ -77,7 +77,11 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.entry_stock.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_stock)) 
         self.entry_stock.bind("<Return>", self.guardar_cambios)
         self.entry_stock.bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
-        
+
+        self.lbl_info_paquete = nuevo_label(self.frame_edicion, "", color_texto="#4fa6ff", fuente=("Arial", 12, "bold"))
+        self.lbl_info_paquete.grid(row=5, column=0, columnspan=2, pady=(5, 5))
+        self.lbl_info_paquete.grid_remove()
+
         # --- BOTONES ---
         self.frame_botones = nuevo_frame(self.frame_central)
         self.frame_botones.pack(pady=10)
@@ -89,6 +93,11 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.btn_cancelar = nuevo_boton(self.frame_botones, "Cancelar (ESC)", lambda: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO), color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER)
         self.btn_cancelar.grid(row=0, column=1, padx=10)
         self.btn_cancelar.configure(state="disabled")
+        self.winfo_toplevel().bind("<Escape>", lambda event: self.reiniciar_pantalla("Edición cancelada.", COLOR_FALLO))
+
+        self.btn_edicion_avanzada = nuevo_boton(self.frame_botones, "Edición Avanzada", comando=self.abrir_modal_avanzado, color_fondo="#5e17eb", color_hover="#4a11c0", ancho=250)
+        self.btn_edicion_avanzada.grid(row=1, column=0, columnspan=2, pady=(15, 0))
+        self.btn_edicion_avanzada.configure(state="disabled")
 
         # --- MENSAJE DE ESTADO ---
         self.lbl_mensaje = nuevo_label(self.frame_central, "")
@@ -119,10 +128,28 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.entry_precio.insert(0, str(int(producto["precio_venta"])))
         self.entry_stock.insert(0, str(producto["stock"]))
 
+        # --- LÓGICA DE PAQUETE RELACIONAL ---
+        datos_completos = obtener_producto_por_id(producto["id"])
+        if datos_completos and datos_completos.get("es_paquete"):
+            base_id = datos_completos.get("producto_base_id")
+            cant = datos_completos.get("cantidad_por_paquete")
+            unitarios = obtener_productos_unitarios()
+
+            nombre_base = next((u["nombre"] for u in unitarios if u["id"] == base_id), "Desconocida/Eliminada")
+
+            self.lbl_info_paquete.configure(text=f"Paquete de {nombre_base} | Cant. por paquete: {cant}")
+            self.lbl_info_paquete.grid()
+        else:
+            self.lbl_info_paquete.grid_remove()
+
         rol_usuario = self.winfo_toplevel().usuario_actual['rol']
+
         if rol_usuario == "Vendedor":
             self.entry_costo.configure(state="disabled")
             self.entry_precio.configure(state="disabled")
+            self.btn_edicion_avanzada.configure(state="disabled", text="Edición Avanzada (🔒 Solo Admin)", text_color=COLOR_FALLO)
+        else:
+            self.btn_edicion_avanzada.configure(state="normal", text="Edición Avanzada")
 
     def buscar_externamente(self, criterio):
         """Llamado desde el inventario para auto-buscar el producto."""
@@ -132,7 +159,6 @@ class VistaEditarProducto(ConfiguracionComponentes):
 
     # --- BÚSQUEDA DE PRODUCTOS EN LA DB ---
     def buscar_producto(self, event=None):
-
         if self.autocompletado.procesar_enter(): return
         
         criterio = self.entry_busqueda.get().strip()
@@ -143,25 +169,65 @@ class VistaEditarProducto(ConfiguracionComponentes):
         if not producto:
             resultados = buscar_productos_por_nombre(criterio)
             if resultados:
-                producto = resultados[0] 
+
+                producto_exacto = next((p for p in resultados if p['nombre'].lower() == criterio.lower()), None)
+                producto = producto_exacto if producto_exacto else resultados[0] 
 
         if producto:
-            if not producto.get('activo', True):
-                self.reiniciar_pantalla("Este producto se encuentra inhabilitado, habilitelo desde el menú inventario para editarlo.", color="#d4ac0d")
-                return
-
-            self.producto_id_actual = producto["id"]
-            self.nombre_actual = producto["nombre"]
-            self.codigo_actual = producto["codigo_barras"]
-            self.deshabilitar(self.elementos_busqueda)
-            
-            self.cargar_datos_en_pantalla(producto)
-            self.habilitar(self.botones_accion)
-            
-            self.lbl_mensaje.configure(text="Producto cargado.", text_color=COLOR_EXITO)
-            self.entry_stock.focus()
+            self.procesar_carga_producto(producto)
         else:
             self.reiniciar_pantalla("No se encontró ningún producto.", COLOR_FALLO)
+
+    def procesar_carga_producto(self, producto):
+        """Aísla la validación y carga. Evita re-consultar a la BD si ya tenemos el objeto."""
+        if not producto.get('activo', True):
+            self.reiniciar_pantalla("Este producto se encuentra inhabilitado, habilitelo desde el menú inventario para editarlo.", color="#d4ac0d")
+            return
+
+        ventana_ppal = self.winfo_toplevel()
+        if hasattr(ventana_ppal, 'carrito_guardado') and ventana_ppal.carrito_guardado:
+            for item in ventana_ppal.carrito_guardado:
+                if item['id'] == producto['id']:
+                    self.reiniciar_pantalla("No se puede editar un producto que está actualmente en el carrito de compras.", color="#d4ac0d")
+                    return
+
+        self.producto_id_actual = producto["id"]
+        self.nombre_actual = producto["nombre"]
+        self.codigo_actual = producto["codigo_barras"]
+        self.deshabilitar(self.elementos_busqueda)
+        
+        self.cargar_datos_en_pantalla(producto)
+        self.habilitar(self.botones_accion)
+        
+        self.lbl_mensaje.configure(text="Producto cargado.", text_color=COLOR_EXITO)
+        self.entry_stock.focus()
+
+    def resultado_autocompletado(self, producto):
+        """Se activa cuando el autocompletado devuelve un producto."""
+        self.entry_busqueda.delete(0, 'end')
+        self.entry_busqueda.insert(0, producto['codigo_barras'] if producto['codigo_barras'] else producto['nombre'])
+
+        self.procesar_carga_producto(producto)
+
+    def abrir_modal_avanzado(self):
+        if not self.producto_id_actual: return
+        from ui.modales.modal_edicion_avanzada import ModalEdicionAvanzada
+        ModalEdicionAvanzada(self.winfo_toplevel(), self.producto_id_actual, self.al_cerrar_modal_avanzado)
+        
+    def al_cerrar_modal_avanzado(self, exito, mensaje, fue_eliminado, nuevo_nombre, nuevo_codigo, es_cambio_estado=False):
+        """Se ejecuta cuando el modal se cierra exitosamente."""
+        if exito:
+            if fue_eliminado:
+                self.reiniciar_pantalla("Producto eliminado definitivamente.", COLOR_EXITO)
+            elif es_cambio_estado:
+                self.reiniciar_pantalla(mensaje, COLOR_EXITO)
+            else:
+                self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_EXITO)
+                self.nombre_actual = nuevo_nombre
+                self.codigo_actual = nuevo_codigo
+                self.lbl_valor_nombre.configure(text=nuevo_nombre)
+                self.lbl_valor_codigo.configure(text=nuevo_codigo if nuevo_codigo else "N/A")
+                self.buscar_externamente(nuevo_codigo if nuevo_codigo else nuevo_nombre)
 
     # --- GUARDAR NUEVA INFO EN LA DB (CON VALIDACIÓN DE ROL) ---
     def guardar_cambios(self, event=None):
@@ -220,14 +286,20 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.limpiar_campos()
         self.deshabilitar(self.entradas_editables, self.botones_accion)
         self.habilitar(self.elementos_busqueda)
-        
+        self.btn_edicion_avanzada.configure(state="disabled")
+
+        self.lbl_info_paquete.grid_remove()
+
         self.entry_busqueda.delete(0, 'end')
         self.entry_busqueda.focus()
         
         self.lbl_mensaje.configure(text=mensaje, text_color=color)
 
-    def resultado_autocompletado(self, producto):
-        """Se activa cuando el autocompletado devuelve un producto (vía clic o Enter)."""
-        self.entry_busqueda.delete(0, 'end')
-        self.entry_busqueda.insert(0, producto['codigo_barras'] if producto['codigo_barras'] else producto['nombre'])
-        self.buscar_producto()
+    # --- DESHABILITADOR DE ATAJOS ---
+    def destroy(self):
+        """Se ejecuta al cambiar de vista. Limpia los atajos de teclado globales."""
+        try:
+            self.winfo_toplevel().unbind("<Escape>")
+        except Exception:
+            pass
+        super().destroy()

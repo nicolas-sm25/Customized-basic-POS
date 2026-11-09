@@ -243,3 +243,68 @@ def reactivar_producto_db(producto_id):
         return False, f"Error al reactivar: {str(e)}"
     finally:
         sesion.close()
+
+def obtener_producto_por_id(producto_id):
+    """Obtiene el diccionario completo de un producto por su ID."""
+    sesion = SessionLocal()
+    try:
+        p = sesion.query(Producto).filter(Producto.id == producto_id).first()
+        if p:
+            return {
+                "id": p.id,
+                "nombre": p.nombre,
+                "codigo_barras": p.codigo_barras,
+                "es_paquete": p.es_paquete,
+                "producto_base_id": p.producto_base_id,
+                "cantidad_por_paquete": p.cantidad_por_paquete
+            }
+        return None
+    finally:
+        sesion.close()
+
+def verificar_ventas_producto(producto_id):
+    """Retorna True si el producto ya se vendió alguna vez o está en un pedido guardado."""
+    from dal.modelos.ventas import DetalleVenta
+    sesion = SessionLocal()
+    try:
+        tiene_ventas = sesion.query(DetalleVenta).filter(DetalleVenta.producto_id == producto_id).first()
+        return tiene_ventas is not None
+    finally:
+        sesion.close()
+
+def eliminar_producto_definitivo(producto_id):
+    """Borra el producto de la base de datos (Solo si no tiene ventas)."""
+    sesion = SessionLocal()
+    try:
+        producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
+        if not producto: return False, "Producto no encontrado."
+        
+        sesion.delete(producto)
+        sesion.commit()
+        return True, "Producto eliminado definitivamente."
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error al eliminar: {e}"
+    finally:
+        sesion.close()
+
+def actualizar_producto_avanzado(producto_id, nombre, codigo, es_paquete, producto_base_id, cantidad_paquete):
+    """Actualiza datos sensibles y relacionales del producto."""
+    sesion = SessionLocal()
+    try:
+        producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
+        if not producto: return False, "Producto no encontrado."
+        
+        producto.nombre = nombre
+        producto.codigo_barras = codigo if codigo else None
+        producto.es_paquete = es_paquete
+        producto.producto_base_id = producto_base_id if es_paquete else None
+        producto.cantidad_por_paquete = cantidad_paquete if es_paquete else 1
+        
+        sesion.commit()
+        return True, "Edición avanzada guardada correctamente."
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error en BD: {e}"
+    finally:
+        sesion.close()
