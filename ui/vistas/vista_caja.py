@@ -273,6 +273,7 @@ class VistaCaja(ConfiguracionComponentes):
         else:
             self.entry_buscar_prod.configure(placeholder_text="Error al registrar gasto", placeholder_text_color=COLOR_FALLO)
         self.after(2000, lambda: self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"))
+        self.after(1, lambda: [self.entry_buscar_prod.focus()])
 
     # --- POP-UP PEDIDOS GUARDADOS ---
     def abrir_modal_ver_guardadas(self):
@@ -290,7 +291,7 @@ class VistaCaja(ConfiguracionComponentes):
         self.entry_buscar_prod.delete(0, 'end')
         self.entry_buscar_prod.configure(placeholder_text=f"¡Pedido de {venta['cliente']} recuperado!", placeholder_text_color=COLOR_EXITO)
         
-        self.after(1500, lambda: [
+        self.after(2000, lambda: [
             self.focus(), 
             self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
             self.entry_buscar_prod.focus()
@@ -304,7 +305,7 @@ class VistaCaja(ConfiguracionComponentes):
         else:
             self.entry_buscar_prod.configure(placeholder_text="Error al eliminar", placeholder_text_color=COLOR_FALLO)
         
-        self.after(1500, lambda: [
+        self.after(2000, lambda: [
             self.focus(), 
             self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
             self.entry_buscar_prod.focus()
@@ -428,7 +429,8 @@ class VistaCaja(ConfiguracionComponentes):
             if not producto.get('activo', True):
                 self.entry_buscar_prod.delete(0, 'end')
                 self.entry_buscar_prod.configure(placeholder_text="¡Producto inhabilitado!", placeholder_text_color="#d4ac0d")
-                self.after(1500, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray"), self.entry_buscar_prod.focus()])
+                self.after(1500, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray")])
+                self.after(5, lambda: [self.entry_buscar_prod.focus()])    
                 return
                 
             self.panel_carrito.agregar_producto(producto, cantidad=cantidad)
@@ -436,7 +438,8 @@ class VistaCaja(ConfiguracionComponentes):
         else:
             self.entry_buscar_prod.delete(0, 'end')
             self.entry_buscar_prod.configure(placeholder_text="¡Producto no encontrado!", placeholder_text_color=COLOR_FALLO)
-            self.after(1000, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray"), self.entry_buscar_prod.focus()])
+            self.after(1500, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray")])
+            self.after(5, lambda: [self.entry_buscar_prod.focus()])
 
     # --- DESHABILITADOR DE ATAJOS ---
     def destroy(self):
