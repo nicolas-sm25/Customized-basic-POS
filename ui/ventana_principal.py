@@ -18,7 +18,7 @@ from ui.vistas.vista_configuracion import VistaConfiguracion
 
 from ui.modales.modal_login import ModalLogin
 
-from bll.gestor_caja import obtener_caja_abierta
+from bll.gestor_caja import obtener_caja_abierta, verificar_cierre_inesperado
 
 class VentanaPrincipal(ctk.CTk):
     def __init__(self, nombre_tienda= "TIENDA"):
@@ -45,6 +45,8 @@ class VentanaPrincipal(ctk.CTk):
         self.frame_contenido = nuevo_frame(self)
         self.frame_contenido.grid(row=0, column=1, sticky="nsew")
         self.vista_actual = None 
+
+        verificar_cierre_inesperado()
 
         # Lanzar modal de login al abrir la app
         self.after(100, lambda: ModalLogin(self, self.iniciar_sesion_exitoso))

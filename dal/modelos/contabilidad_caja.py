@@ -11,7 +11,10 @@ class ContabilidadCaja(Base):
     fecha_apertura = Column(DateTime, default=datetime.now)
     fecha_cierre = Column(DateTime, nullable=True)
     base_efectivo = Column(Float, default=0.0)
-    abierta = Column(Boolean, default=True)
+    estado = Column(String, default="Abierta", nullable=False)
+
+    recuperada_por = Column(String, nullable=True)
+    fecha_recuperacion = Column(DateTime, nullable=True)
     
     ventas_efectivo = Column(Float, default=0.0)
     ventas_nequi = Column(Float, default=0.0)

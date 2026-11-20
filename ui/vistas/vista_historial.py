@@ -126,11 +126,29 @@ class VistaHistorial(ConfiguracionComponentes):
             for i, weight in enumerate(cols):
                 f_item.grid_columnconfigure(i, weight=weight, uniform="hist")
 
-            nuevo_label(f_item, caja['encargado'], fuente=("Arial", 11, "bold"), color_texto="#d4ac0d", poscicion="w").grid(row=0, column=0, sticky="w", padx=10, pady=10)
+            # Columna Encargado (con nota si fue recuperada)
+            f_enc_celda = nuevo_frame(f_item, color_fondo="transparent")
+            f_enc_celda.grid(row=0, column=0, sticky="w", padx=10, pady=8)
+            nuevo_label(f_enc_celda, caja['encargado'], fuente=("Arial", 11, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w")
+            if caja.get('recuperada_por'):
+                nuevo_label(
+                    f_enc_celda,
+                    f"🔄 {caja['recuperada_por']}",
+                    fuente=("Arial", 9, "italic"),
+                    color_texto="#4fa6ff",
+                    poscicion="w"
+                ).pack(anchor="w")
+
             nuevo_label(f_item, caja['fecha_apertura'], fuente=("Arial", 11), poscicion="center").grid(row=0, column=1, sticky="nsew", pady=10)
             
-            color_cierre = "#d4ac0d" if caja['estado'] == "Abierta" else "#ffffff"
-            nuevo_label(f_item, caja['fecha_cierre'], fuente=("Arial", 11, "bold" if caja['estado'] == "Abierta" else "normal"), color_texto=color_cierre, poscicion="center").grid(row=0, column=2, sticky="nsew", pady=10)
+            if caja['estado'] == "Abierta":
+                color_cierre, peso_cierre = "#d4ac0d", "bold"
+            elif caja['estado'] == "Incompleta":
+                color_cierre, peso_cierre = "#db4e17", "bold"
+            else:
+                color_cierre, peso_cierre = "#ffffff", "normal"
+
+            nuevo_label(f_item, caja['fecha_cierre'], fuente=("Arial", 11, peso_cierre), color_texto=color_cierre, poscicion="center").grid(row=0, column=2, sticky="nsew", pady=10)
             
             nuevo_label(f_item, f"${int(caja['base']):,}".replace(",", "."), fuente=("Arial", 11), poscicion="e").grid(row=0, column=3, sticky="e", pady=10, padx=5)
             nuevo_label(f_item, f"${int(caja['ventas']):,}".replace(",", "."), fuente=("Arial", 11, "bold"), color_texto=COLOR_EXITO, poscicion="e").grid(row=0, column=4, sticky="e", pady=10, padx=5)
@@ -140,18 +158,38 @@ class VistaHistorial(ConfiguracionComponentes):
             dif = caja['diferencia']
             col_dif = COLOR_EXITO if dif >= 0 else COLOR_FALLO
             txt_dif = f"+${int(dif):,}".replace(",", ".") if dif >= 0 else f"-${abs(int(dif)):,}".replace(",", ".")
-            if caja['estado'] == "Abierta":
+            if caja['estado'] != "Cerrada":
                 txt_dif, col_dif = "-", "#a0a0a0"
                 
             nuevo_label(f_item, txt_dif, fuente=("Arial", 11, "bold"), color_texto=col_dif, poscicion="e").grid(row=0, column=7, sticky="e", pady=10, padx=5)
             
             efectivo_fisico_real = (caja['base'] + caja['ventas'] - caja['gastos'] + caja['diferencia']) if caja['estado'] == "Cerrada" else 0
-            txt_efectivo = f"${int(efectivo_fisico_real):,}".replace(",", ".") if caja['estado'] == "Cerrada" else "En curso..."
-            nuevo_label(f_item, txt_efectivo, fuente=("Arial", 11, "bold"), color_texto="#ffffff" if caja['estado'] == "Cerrada" else "#d4ac0d", poscicion="e").grid(row=0, column=8, sticky="e", pady=10, padx=5)
+            if caja['estado'] == "Cerrada":
+                txt_efectivo, col_ef = f"${int(efectivo_fisico_real):,}".replace(",", "."), "#ffffff"
+            elif caja['estado'] == "Incompleta":
+                txt_efectivo, col_ef = "Sin cierre", "#db4e17"
+            else:
+                txt_efectivo, col_ef = "En curso...", "#d4ac0d"
+
+            nuevo_label(f_item, txt_efectivo, fuente=("Arial", 11, "bold"), color_texto=col_ef, poscicion="e").grid(row=0, column=8, sticky="e", pady=10, padx=5)
 
             f_btn = nuevo_frame(f_item, color_fondo="transparent")
             f_btn.grid(row=0, column=9, sticky="nsew", padx=5, pady=5)
             if caja['estado'] == "Cerrada":
                 nuevo_boton(f_btn, "Detalles", comando=lambda c=caja: self.abrir_detalles_caja(c), color_fondo="#1f538d", color_hover="#14375e", ancho=75).pack(expand=True)
+            elif caja['estado'] == "Incompleta":
+                nuevo_boton(f_btn, "Auditar", comando=lambda c=caja: self.auditar_caja_incompleta(c), color_fondo="#db4e17", color_hover="#922F10", ancho=75).pack(expand=True)
             else:
                 nuevo_label(f_btn, "-", color_texto="#a0a0a0", poscicion="center").pack(expand=True)
+                
+    def auditar_caja_incompleta(self, caja):
+            from ui.modales.modal_cierre_caja import ModalCierreCaja
+            from bll.gestor_caja import cerrar_caja_definitiva
+
+            def confirmar_auditoria(efectivo_fisico, diferencia):
+                admin = getattr(self.winfo_toplevel(), 'usuario_actual', {}).get('nombre', 'Administrador')
+                exito, _ = cerrar_caja_definitiva(caja['id'], efectivo_fisico, diferencia, auditada_por=admin)
+                if exito:
+                    self.cargar_historial()
+
+            ModalCierreCaja(self.winfo_toplevel(), caja['id'], confirmar_auditoria)

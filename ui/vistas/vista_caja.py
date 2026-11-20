@@ -42,11 +42,39 @@ class VistaCaja(ConfiguracionComponentes):
         frame_centro = nuevo_frame(self.frame_principal)
         frame_centro.pack(expand=True)
 
-        self.lbl_titulo = nuevo_label(frame_centro, "Abrir caja", fuente=FUENTE_TITULOS)
-        self.lbl_titulo.pack(pady=20)
+        caja_incompleta = obtener_caja_incompleta()
+        if caja_incompleta:
+            f_alerta = nuevo_frame(frame_centro, color_fondo="#3a2810", radio_esquinas=10)
+            f_alerta.pack(fill="x", padx=20, pady=(10, 20))
+
+            nuevo_label(
+                f_alerta,
+                "⚠️ Cierre Inesperado Detectado",
+                fuente=("Arial", 15, "bold"),
+                color_texto="#d4ac0d"
+            ).pack(pady=(12, 4), padx=20)
+
+            nuevo_label(
+                f_alerta,
+                f"La caja de {caja_incompleta['encargado']} abierta el {caja_incompleta['fecha_apertura']}\nse cerró inesperadamente y quedó incompleta.",
+                fuente=("Arial", 12),
+                color_texto="#ffffff"
+            ).pack(pady=(0, 10), padx=20)
+
+            nuevo_boton(
+                f_alerta,
+                "Recuperar Caja Anterior",
+                comando=lambda cid=caja_incompleta['id']: self.ejecutar_recuperacion(cid),
+                color_fondo="#d4ac0d",
+                color_hover="#b9770e",
+                ancho=220
+            ).pack(pady=(0, 14))
+
+        self.lbl_titulo = nuevo_label(frame_centro, "Abrir caja nueva", fuente=FUENTE_TITULOS)
+        self.lbl_titulo.pack(pady=10)
 
         self.lbl_instruccion = nuevo_label(frame_centro, "Ingrese el valor efectivo inicial que se encuentra en la caja:")
-        self.lbl_instruccion.pack(pady=10)
+        self.lbl_instruccion.pack(pady=8)
 
         self.entry_base = nueva_caja_texto(frame_centro, placeholder="Ej: 50000")
         self.entry_base.pack(pady=10)
@@ -60,12 +88,22 @@ class VistaCaja(ConfiguracionComponentes):
             color_fondo=COLOR_EXITO, 
             color_hover=COLOR_EXITO_HOVER
         )
-        self.btn_abrir.pack(pady=20)
+        self.btn_abrir.pack(pady=15)
 
         self.lbl_mensaje = nuevo_label(frame_centro, "")
         self.lbl_mensaje.pack(pady=5)
         
         self.after(1, self.entry_base.focus)
+
+    def ejecutar_recuperacion(self, caja_id):
+        ventana_ppal = self.winfo_toplevel()
+        nombre_usuario = getattr(ventana_ppal, 'usuario_actual', {}).get('nombre', 'Desconocido')
+
+        exito, mensaje = recuperar_caja_incompleta(caja_id, nombre_usuario)
+        if exito:
+            self.verificar_estado_caja()
+        else:
+            self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 
     def ejecutar_apertura(self, event=None):
         base_str = self.entry_base.get().replace(".", "").strip()
@@ -460,8 +498,7 @@ class VistaCaja(ConfiguracionComponentes):
         else:
             self.entry_buscar_prod.delete(0, 'end')
             self.entry_buscar_prod.configure(placeholder_text="¡Producto no encontrado!", placeholder_text_color=COLOR_FALLO)
-            self.after(1500, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray")])
-            self.after(5, lambda: [self.entry_buscar_prod.focus()])
+            self.after(1500, lambda: [self.entry_buscar_prod.configure(placeholder_text="Código o Nombre...", placeholder_text_color="gray"), self.entry_buscar_prod.focus()])
 
     # --- DESHABILITADOR DE ATAJOS ---
     def destroy(self):

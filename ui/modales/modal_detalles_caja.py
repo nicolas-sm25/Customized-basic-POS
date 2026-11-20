@@ -421,6 +421,14 @@ class ModalDetallesCaja:
         if not resumen:
             nuevo_label(frame_modal, "Error al cargar el resumen de la caja.", color_texto=COLOR_FALLO).pack(pady=20)
             return
+        
+        if resumen.get("recuperada_por"):
+            nuevo_label(
+                frame_modal,
+                f"Caja recuperada por {resumen['recuperada_por']} el {resumen['fecha_recuperacion']}",
+                fuente=("Arial", 11, "bold"),
+                color_texto="#4fa6ff"
+            ).pack(pady=(0, 6))
 
         ventas, ventas_guardadas, gastos = obtener_detalles_turno(caja["id"])
 
@@ -448,7 +456,7 @@ class ModalDetallesCaja:
         self.crear_fila_stat(f_flujo, "Salidas (Gastos):", f"- ${int(resumen['gastos']):,}".replace(",", "."))
         self.crear_fila_stat(f_flujo, "Efectivo Esperado en Caja:", f"${int(resumen['efectivo_esperado']):,}".replace(",", "."), "#d4ac0d", bold=True)
 
-        if not resumen["abierta"] and resumen["efectivo_cierre"] is not None:
+        if resumen["estado"] == "Cerrada" and resumen["efectivo_cierre"] is not None:
             nuevo_frame(f_flujo, color_fondo="#444444", alto=1).pack(fill="x", padx=30, pady=4)
             self.crear_fila_stat(f_flujo, "Efectivo Físico Contado:", f"${int(resumen['efectivo_cierre']):,}".replace(",", "."), "#ffffff", bold=True)
 
