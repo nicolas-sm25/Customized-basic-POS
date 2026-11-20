@@ -2,6 +2,7 @@ from dal.conexion_DB import SessionLocal
 from dal.modelos.ventas import Venta, DetalleVenta
 from dal.modelos.productos import Producto
 from dal.modelos.contabilidad_caja import ContabilidadCaja
+from bll.gestor_notificaciones import evaluar_notificaciones_producto, cumplir_notificacion_por_tipo_entidad
 from datetime import datetime
 
 
@@ -35,12 +36,15 @@ def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente=None, pagado=T
         sesion.add(nueva_venta)
         sesion.flush()
 
+        ids_productos_afectados = set()
+
         for item in carrito:
             subtotal = item['subtotal']
             ganancia_item = (item['precio_venta'] - item['costo']) * item['cantidad']
 
             total_venta += subtotal
             ganancia_venta += ganancia_item
+            ids_productos_afectados.add(item['id'])
 
             detalle = DetalleVenta(
                 venta_id=nueva_venta.id,
@@ -70,6 +74,7 @@ def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente=None, pagado=T
         nueva_venta.total = total_venta
         nueva_venta.ganancia_total = ganancia_venta
 
+        origen_id_pagado = None
         if pagado:
             if caja_id:
                 caja = sesion.query(ContabilidadCaja).filter(ContabilidadCaja.id == caja_id).first()
@@ -84,8 +89,16 @@ def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente=None, pagado=T
                 if venta_origen_db:
                     fecha_pago_str = datetime.now().strftime("%d-%m-%Y")
                     venta_origen_db.metodo_pago = f"Pagada|{fecha_pago_str}"
+                    origen_id_pagado = venta_origen_db.id
 
         sesion.commit()
+
+        if origen_id_pagado:
+            cumplir_notificacion_por_tipo_entidad("VENTA_ANTIGUA", origen_id_pagado)
+
+        for prod_id in ids_productos_afectados:
+            evaluar_notificaciones_producto(prod_id)
+
         return True, "Venta registrada con éxito."
 
     except Exception as e:
@@ -137,6 +150,7 @@ def eliminar_venta_pendiente(venta_id):
         if venta:
             sesion.delete(venta)
             sesion.commit()
+            cumplir_notificacion_por_tipo_entidad("VENTA_ANTIGUA", venta_id)
             return True
         return False
     except Exception as e:
@@ -175,6 +189,7 @@ def registrar_perdida_venta_guardada(venta_id, caja_id=None):
         venta.metodo_pago = f"Eliminada|{fecha_eliminacion}"
 
         sesion.commit()
+        cumplir_notificacion_por_tipo_entidad("VENTA_ANTIGUA", venta_id)
         return True, "Pedido eliminado y registrado como pérdida."
     except Exception as e:
         sesion.rollback()

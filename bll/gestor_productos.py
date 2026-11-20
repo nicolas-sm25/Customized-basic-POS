@@ -1,5 +1,6 @@
 from dal.conexion_DB import SessionLocal
-from dal.modelos.productos import Producto 
+from dal.modelos.productos import Producto
+from bll.gestor_notificaciones import evaluar_notificaciones_producto, limpiar_notificaciones_producto
 
 def agregar_producto(nombre, costo, precio_venta, codigo_barras=None, stock=0, es_paquete=False, producto_base_id=None, cantidad_por_paquete=1):
     sesion = SessionLocal()
@@ -9,7 +10,7 @@ def agregar_producto(nombre, costo, precio_venta, codigo_barras=None, stock=0, e
             costo=costo,
             precio_venta=precio_venta,
             codigo_barras=codigo_barras,
-            stock=stock, 
+            stock=stock,
             es_paquete=es_paquete,
             producto_base_id=producto_base_id,
             cantidad_por_paquete=cantidad_por_paquete
@@ -27,26 +28,30 @@ def agregar_producto(nombre, costo, precio_venta, codigo_barras=None, stock=0, e
                 for paquete in paquetes_vinculados:
                     paquete.stock = producto_base.stock // paquete.cantidad_por_paquete
 
+        prod_id = nuevo_prod.id
         sesion.commit()
+
+        if es_paquete and producto_base_id:
+            evaluar_notificaciones_producto(producto_base_id)
+        evaluar_notificaciones_producto(prod_id)
+
         return True, f"Producto '{nombre}' agregado exitosamente."
     except Exception as e:
         sesion.rollback()
         return False, f"Error al guardar: {str(e)}"
     finally:
-        sesion.close()            
-
+        sesion.close()
 
 def buscar_productos_por_nombre(nombre_parcial):
     sesion = SessionLocal()
     try:
         criterio_limpio = nombre_parcial.replace(" ", "")
-
         criterio_like = "%" + "%".join(list(criterio_limpio)) + "%"
 
         productos = sesion.query(Producto).filter(
             Producto.nombre.ilike(criterio_like)
         ).all()
-        
+
         return [{
             "id": p.id,
             "nombre": p.nombre,
@@ -54,7 +59,7 @@ def buscar_productos_por_nombre(nombre_parcial):
             "costo": p.costo,
             "precio_venta": p.precio_venta,
             "stock": p.stock,
-            "activo": p.activo 
+            "activo": p.activo
         } for p in productos]
     except Exception:
         return []
@@ -81,17 +86,13 @@ def buscar_producto_por_codigo(codigo):
     finally:
         sesion.close()
 
-
 def actualizar_producto(id_producto, nombre, costo, precio_venta, codigo_barras, stock_nuevo):
-    
     sesion = SessionLocal()
-    
     try:
         producto = sesion.query(Producto).filter(Producto.id == id_producto).first()
-        
         if not producto:
             return False, "Producto no encontrado en la base de datos."
-        
+
         stock_antiguo = producto.stock
         diferencia_stock = stock_nuevo - stock_antiguo
 
@@ -100,26 +101,25 @@ def actualizar_producto(id_producto, nombre, costo, precio_venta, codigo_barras,
                 producto_base = sesion.query(Producto).filter(Producto.id == producto.producto_base_id).first()
                 if producto_base:
                     producto_base.stock += (diferencia_stock * producto.cantidad_por_paquete)
-                    
             else:
                 paquetes_vinculados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
                 for paquete in paquetes_vinculados:
                     nuevo_stock_base = producto.stock + diferencia_stock
                     paquete.stock = nuevo_stock_base // paquete.cantidad_por_paquete
-        
+
         producto.nombre = nombre
         producto.costo = costo
         producto.precio_venta = precio_venta
         producto.codigo_barras = codigo_barras
         producto.stock = stock_nuevo
-        
+
         sesion.commit()
+        evaluar_notificaciones_producto(id_producto)
+
         return True, "Producto actualizado correctamente."
-        
     except Exception as e:
         sesion.rollback()
         return False, f"Error interno al intentar actualizar el producto: {str(e)}"
-        
     finally:
         sesion.close()
 
@@ -130,7 +130,6 @@ def sincronizar_stock_relacional(sesion, producto_id, cantidad_agregada):
     Se debe llamar ANTES de hacer el sesion.commit() al agregar/editar stock.
     """
     producto_db = sesion.query(Producto).filter(Producto.id == producto_id).first()
-    
     if not producto_db:
         return
 
@@ -139,7 +138,6 @@ def sincronizar_stock_relacional(sesion, producto_id, cantidad_agregada):
         if producto_base:
             producto_base.stock += (cantidad_agregada * producto_db.cantidad_por_paquete)
             producto_db.stock = producto_base.stock // producto_db.cantidad_por_paquete
-
     else:
         producto_db.stock += cantidad_agregada
         paquetes_vinculados = sesion.query(Producto).filter(Producto.producto_base_id == producto_db.id).all()
@@ -151,7 +149,7 @@ def obtener_productos_unitarios():
     sesion = SessionLocal()
     try:
         productos = sesion.query(Producto).filter(
-            Producto.es_paquete == False, 
+            Producto.es_paquete == False,
             Producto.activo == True
         ).all()
         return [{"id": p.id, "nombre": p.nombre} for p in productos]
@@ -202,7 +200,7 @@ def desactivar_producto_db(producto_id):
         producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
         if not producto:
             return False, "Producto no encontrado."
-        
+
         producto.activo = False
 
         if not producto.es_paquete:
@@ -210,8 +208,10 @@ def desactivar_producto_db(producto_id):
             for paquete in paquetes_vinculados:
                 paquete.activo = False
 
+        nombre_prod = producto.nombre
         sesion.commit()
-        return True, f"Producto '{producto.nombre}' desactivado correctamente."
+        evaluar_notificaciones_producto(producto_id)
+        return True, f"Producto '{nombre_prod}' desactivado correctamente."
     except Exception as e:
         sesion.rollback()
         return False, f"Error al desactivar: {str(e)}"
@@ -225,7 +225,7 @@ def reactivar_producto_db(producto_id):
         producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
         if not producto:
             return False, "Producto no encontrado."
-        
+
         producto.activo = True
 
         if not producto.es_paquete:
@@ -233,8 +233,10 @@ def reactivar_producto_db(producto_id):
             for paquete in paquetes_vinculados:
                 paquete.activo = True
 
+        nombre_prod = producto.nombre
         sesion.commit()
-        return True, f"Producto '{producto.nombre}' reactivado correctamente."
+        evaluar_notificaciones_producto(producto_id)
+        return True, f"Producto '{nombre_prod}' reactivado correctamente."
     except Exception as e:
         sesion.rollback()
         return False, f"Error al reactivar: {str(e)}"
@@ -251,6 +253,10 @@ def obtener_producto_por_id(producto_id):
                 "id": p.id,
                 "nombre": p.nombre,
                 "codigo_barras": p.codigo_barras,
+                "costo": p.costo,
+                "precio_venta": p.precio_venta,
+                "stock": p.stock,
+                "activo": p.activo,
                 "es_paquete": p.es_paquete,
                 "producto_base_id": p.producto_base_id,
                 "cantidad_por_paquete": p.cantidad_por_paquete
@@ -274,10 +280,12 @@ def eliminar_producto_definitivo(producto_id):
     sesion = SessionLocal()
     try:
         producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
-        if not producto: return False, "Producto no encontrado."
-        
+        if not producto:
+            return False, "Producto no encontrado."
+
         sesion.delete(producto)
         sesion.commit()
+        limpiar_notificaciones_producto(producto_id)
         return True, "Producto eliminado definitivamente."
     except Exception as e:
         sesion.rollback()
@@ -290,18 +298,72 @@ def actualizar_producto_avanzado(producto_id, nombre, codigo, es_paquete, produc
     sesion = SessionLocal()
     try:
         producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
-        if not producto: return False, "Producto no encontrado."
-        
+        if not producto:
+            return False, "Producto no encontrado."
+
         producto.nombre = nombre
         producto.codigo_barras = codigo if codigo else None
         producto.es_paquete = es_paquete
         producto.producto_base_id = producto_base_id if es_paquete else None
         producto.cantidad_por_paquete = cantidad_paquete if es_paquete else 1
-        
+
         sesion.commit()
+        evaluar_notificaciones_producto(producto_id)
+
         return True, "Edición avanzada guardada correctamente."
     except Exception as e:
         sesion.rollback()
         return False, f"Error en BD: {e}"
+    finally:
+        sesion.close()
+
+def sumar_stock_rapido(producto_id, cantidad_agregada):
+    """Suma unidades al stock manteniendo la sincronización relacional y evaluando notificaciones."""
+    if cantidad_agregada <= 0:
+        return False, "La cantidad a añadir debe ser mayor a 0."
+
+    sesion = SessionLocal()
+    try:
+        producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
+        if not producto:
+            return False, "Producto no encontrado."
+
+        sincronizar_stock_relacional(sesion, producto_id, cantidad_agregada)
+        if producto.es_paquete and producto.producto_base_id:
+            paquetes_vinculados = sesion.query(Producto).filter(
+                Producto.producto_base_id == producto.producto_base_id
+            ).all()
+            base = sesion.query(Producto).filter(Producto.id == producto.producto_base_id).first()
+            if base:
+                for p in paquetes_vinculados:
+                    p.stock = base.stock // p.cantidad_por_paquete
+
+        sesion.commit()
+        evaluar_notificaciones_producto(producto_id)
+        return True, "Stock actualizado correctamente."
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error al sumar stock: {e}"
+    finally:
+        sesion.close()
+
+def actualizar_costo_rapido(producto_id, nuevo_costo):
+    """Actualiza únicamente el costo de un producto y evalúa sus notificaciones."""
+    if nuevo_costo <= 0:
+        return False, "El costo debe ser mayor a $0."
+
+    sesion = SessionLocal()
+    try:
+        producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
+        if not producto:
+            return False, "Producto no encontrado."
+
+        producto.costo = nuevo_costo
+        sesion.commit()
+        evaluar_notificaciones_producto(producto_id)
+        return True, "Costo actualizado correctamente."
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error al actualizar costo: {e}"
     finally:
         sesion.close()

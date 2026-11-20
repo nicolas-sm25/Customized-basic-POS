@@ -102,6 +102,9 @@ class VistaCaja(ConfiguracionComponentes):
         exito, mensaje = recuperar_caja_incompleta(caja_id, nombre_usuario)
         if exito:
             self.verificar_estado_caja()
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
         else:
             self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 
@@ -124,6 +127,9 @@ class VistaCaja(ConfiguracionComponentes):
             
             if exito:
                 self.verificar_estado_caja()
+                ventana_ppal = self.winfo_toplevel()
+                if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                    ventana_ppal.actualizar_contador_notificaciones()
             else:
                 self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 
@@ -302,6 +308,11 @@ class VistaCaja(ConfiguracionComponentes):
                 self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"), 
                 self.entry_buscar_prod.focus()
             ])
+
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
+
         else:
             modal_referencia.lbl_error.configure(text=mensaje)
 
@@ -313,6 +324,9 @@ class VistaCaja(ConfiguracionComponentes):
     def confirmar_gasto(self, exito, mensaje):
         if exito:
             self.entry_buscar_prod.configure(placeholder_text="¡Gasto registrado en caja!", placeholder_text_color=COLOR_EXITO)
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
         else:
             self.entry_buscar_prod.configure(placeholder_text="Error al registrar gasto", placeholder_text_color=COLOR_FALLO)
         self.after(2000, lambda: self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"))
@@ -356,6 +370,9 @@ class VistaCaja(ConfiguracionComponentes):
         if exito:
             self.entry_buscar_prod.configure(placeholder_text="¡Pedido eliminado y registrado como pérdida!", placeholder_text_color="#d4ac0d")
             self.actualizar_contador_guardadas()
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
         else:
             self.entry_buscar_prod.configure(placeholder_text="Error al registrar pérdida", placeholder_text_color=COLOR_FALLO)
         
@@ -383,6 +400,9 @@ class VistaCaja(ConfiguracionComponentes):
         
         if exito:
             self.verificar_estado_caja()
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
         else:
             print(f"Error al cerrar: {mensaje}")
 
@@ -455,6 +475,11 @@ class VistaCaja(ConfiguracionComponentes):
                 self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"),
                 self.entry_buscar_prod.focus()
             ])
+
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
+
         else:
             print(mensaje)
 

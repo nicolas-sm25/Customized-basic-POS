@@ -1,6 +1,9 @@
 from datetime import datetime
 from dal.conexion_DB import SessionLocal
 from dal.modelos.contabilidad_caja import ContabilidadCaja
+from dal.modelos.contabilidad_caja import GastoCaja
+from dal.modelos.ventas import Venta
+from bll.gestor_notificaciones import evaluar_notificaciones_producto, cumplir_notificacion_por_tipo_entidad
 
 
 # --- VERIFICAR SI HAY UNA CAJA ABIERTA ---
@@ -77,6 +80,7 @@ def recuperar_caja_incompleta(caja_id, nombre_usuario):
         caja.recuperada_por = nombre_usuario
         caja.fecha_recuperacion = datetime.now()
         sesion.commit()
+        cumplir_notificacion_por_tipo_entidad("CAJA_INCOMPLETA", caja_id)
         return True, "Caja recuperada exitosamente."
     except Exception as e:
         sesion.rollback()
@@ -116,20 +120,20 @@ def cerrar_caja():
         if not cajas_abiertas:
             return False, "No hay ninguna caja abierta en este momento."
 
+        ids_cerradas = [c.id for c in cajas_abiertas]
         for caja in cajas_abiertas:
             caja.estado = "Cerrada"
             caja.fecha_cierre = datetime.now()
 
         sesion.commit()
+        for cid in ids_cerradas:
+            cumplir_notificacion_por_tipo_entidad("CAJA_INCOMPLETA", cid)
         return True, "Caja cerrada exitosamente."
     except Exception as e:
         sesion.rollback()
         return False, f"Error al cerrar la caja: {str(e)}"
     finally:
         sesion.close()
-        
-from dal.modelos.contabilidad_caja import GastoCaja
-from dal.modelos.ventas import Venta
 
 def registrar_gasto(caja_id, descripcion, monto, tipo_gasto="Dinero", producto_id=None, cantidad_descontada=0):
     """Registra una salida de dinero o una baja de inventario (merma) descontando stock."""
@@ -170,6 +174,9 @@ def registrar_gasto(caja_id, descripcion, monto, tipo_gasto="Dinero", producto_i
                 caja.gastos_totales += monto
 
         sesion.commit()
+        if tipo_gasto == "Inventario" and producto_id:
+            evaluar_notificaciones_producto(producto_id)
+
         msg = "Gasto registrado correctamente." if tipo_gasto == "Dinero" else "Baja de inventario registrada."
         return True, msg
     except Exception as e:
@@ -183,10 +190,12 @@ def registrar_mermas_lote(caja_id, descripcion, items_merma):
     from dal.modelos.productos import Producto
     sesion = SessionLocal()
     try:
+        ids_afectados = set()
         for item in items_merma:
             prod_id = item["id"]
             cant = item["cantidad"]
             costo_perdido = item["subtotal"]
+            ids_afectados.add(prod_id)
 
             nuevo_gasto = GastoCaja(
                 caja_id=caja_id,
@@ -216,6 +225,9 @@ def registrar_mermas_lote(caja_id, descripcion, items_merma):
                         d.stock = producto.stock // d.cantidad_por_paquete
 
         sesion.commit()
+        for pid in ids_afectados:
+            evaluar_notificaciones_producto(pid)
+
         return True, "Baja de inventario registrada correctamente."
     except Exception as e:
         sesion.rollback()
@@ -283,6 +295,7 @@ def cerrar_caja_definitiva(caja_id, efectivo_fisico, diferencia, auditada_por=No
                 caja.ganancia_total = resumen['ganancia_bruta']
 
             sesion.commit()
+            cumplir_notificacion_por_tipo_entidad("CAJA_INCOMPLETA", caja_id)
             return True, "Caja cerrada correctamente."
         return False, "Caja no encontrada."
     except Exception as e:
@@ -388,6 +401,15 @@ def obtener_detalles_turno(caja_id):
                 "subtotal": d.subtotal
             } for d in vg.detalles]
 
+            items_recuperar = [{
+                "id": d.producto_id,
+                "nombre": d.producto.nombre if d.producto else f"Producto #{d.producto_id}",
+                "precio_venta": d.precio_unitario,
+                "costo": d.producto.costo if d.producto else 0,
+                "cantidad": d.cantidad,
+                "subtotal": d.subtotal
+            } for d in vg.detalles]
+
             metodo = vg.metodo_pago or "Pendiente"
             if metodo.startswith("Eliminada"):
                 estado_guardada = "Eliminada"
@@ -407,12 +429,16 @@ def obtener_detalles_turno(caja_id):
             ventas_guardadas.append({
                 "id": vg.id,
                 "hora": vg.fecha_hora.strftime("%I:%M %p"),
+                "fecha": vg.fecha_hora.strftime("%d/%m/%Y %I:%M %p") if vg.fecha_hora else "",
+                "fecha_solo": vg.fecha_hora.strftime("%d-%m-%Y") if vg.fecha_hora else "",
+                "cliente": vg.referencia or "Sin Nombre",
                 "referencia": vg.referencia or "Sin referencia",
                 "estado": estado_guardada,
                 "texto_pago": texto_pago,
                 "cantidad_articulos": sum(d.cantidad for d in vg.detalles),
                 "total": vg.total,
-                "detalles": detalles_lista
+                "detalles": detalles_lista,
+                "items": items_recuperar
             })
 
         gastos = [{
@@ -448,5 +474,24 @@ def obtener_todos_los_gastos():
                 "monto": g.monto
             })
         return resultado
+    finally:
+        sesion.close()
+
+def obtener_caja_por_venta(venta_id):
+    """Retorna el diccionario del turno (caja) donde se registró una venta específica."""
+    from dal.modelos.ventas import Venta
+    sesion = SessionLocal()
+    try:
+        venta = sesion.query(Venta).filter(Venta.id == venta_id).first()
+        if not venta or not venta.caja:
+            return None
+
+        c = venta.caja
+        return {
+            "id": c.id,
+            "encargado": c.usuario.nombre if c.usuario else "Desconocido",
+            "fecha_apertura": c.fecha_apertura.strftime("%d/%m/%Y %I:%M %p") if c.fecha_apertura else "N/A",
+            "estado": c.estado
+        }
     finally:
         sesion.close()

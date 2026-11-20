@@ -74,22 +74,38 @@ class ModalDetalleVentaIndividual:
 
 
 class ModalVentasGuardadasTurno:
-    """Modal paginado con las ventas guardadas del turno, su estado y fecha de pago si aplica."""
-    def __init__(self, master, caja, ventas_guardadas):
-        self.modal = nuevo_modal(master, f"Ventas Guardadas del Turno - {caja['encargado']} - {caja['fecha_apertura']}", 920, 580)
+    """Modal paginado con las ventas guardadas del turno, estado, fecha y botón Recuperar condicionado a caja abierta."""
+    def __init__(self, master, caja, ventas_guardadas, venta_resaltada_id=None, modales_padre=None):
+        self.modal = nuevo_modal(master, f"Ventas Guardadas del Turno - {caja['encargado']}", 1020, 600)
         self.modal.focus_force()
+        self.caja = caja
         self.ventas_guardadas = ventas_guardadas
+        self.venta_resaltada_id = venta_resaltada_id
+        self.modales_padre = modales_padre or []
+
+        from bll.gestor_caja import obtener_caja_abierta
+        self.caja_abierta = obtener_caja_abierta() is not None
 
         frame_ppal = nuevo_frame(self.modal)
         frame_ppal.pack(expand=True, fill="both", padx=20, pady=15)
 
+        frame_top = nuevo_frame(frame_ppal, color_fondo="transparent")
+        frame_top.pack(fill="x", pady=(0, 8))
+
         nuevo_label(
-            frame_ppal,
+            frame_top,
             f"Ventas Guardadas del Día ({len(ventas_guardadas)})",
             fuente=("Arial", 16, "bold"),
-            color_texto="#d4ac0d",
-            poscicion="w"
-        ).pack(fill="x", pady=(0, 8))
+            color_texto="#d4ac0d"
+        ).pack(side="left")
+
+        if not self.caja_abierta:
+            nuevo_label(
+                frame_top,
+                "Caja cerrada: abre una caja para poder recuperar pedidos pendientes",
+                fuente=("Arial", 12, "bold"),
+                color_texto="#db4e17"
+            ).pack(side="right")
 
         self.frame_contenedor = nuevo_frame(frame_ppal, color_fondo="#202020", radio_esquinas=10)
         self.frame_contenedor.pack(fill="both", expand=True, pady=(0, 10))
@@ -98,8 +114,14 @@ class ModalVentasGuardadasTurno:
         self.frame_lista.pack(fill="both", expand=True, padx=10, pady=10)
 
         # --- PAGINACIÓN ---
-        self.pagina_actual = 1
         self.items_por_pagina = 7
+        self.pagina_actual = 1
+
+        if self.venta_resaltada_id and self.ventas_guardadas:
+            for idx, vg in enumerate(self.ventas_guardadas):
+                if vg["id"] == self.venta_resaltada_id:
+                    self.pagina_actual = (idx // self.items_por_pagina) + 1
+                    break
 
         self.frame_paginacion = nuevo_frame(self.frame_contenedor, color_fondo="transparent")
         self.frame_paginacion.pack(fill="x", pady=(0, 10))
@@ -160,7 +182,7 @@ class ModalVentasGuardadasTurno:
 
         f_enc = nuevo_frame(self.frame_lista, color_fondo="#1a1a1a")
         f_enc.pack(fill="x", pady=(0, 5), padx=5)
-        cols = [2, 3, 2, 2, 2, 3, 2]
+        cols = [2, 3, 2, 2, 2, 3, 3]
         for i, w in enumerate(cols):
             f_enc.grid_columnconfigure(i, weight=w, uniform="vg_turno")
 
@@ -174,7 +196,14 @@ class ModalVentasGuardadasTurno:
             )
 
         for vg in pagina_items:
-            f = nuevo_frame(self.frame_lista, color_fondo="#2b2b2b")
+            es_resaltada = (vg["id"] == self.venta_resaltada_id)
+            f = ctk.CTkFrame(
+                self.frame_lista,
+                fg_color="#2b2b2b",
+                corner_radius=6,
+                border_width=2 if es_resaltada else 0,
+                border_color="#db4e17" if es_resaltada else "#2b2b2b"
+            )
             f.pack(fill="x", pady=3, padx=5)
             for i, w in enumerate(cols):
                 f.grid_columnconfigure(i, weight=w, uniform="vg_turno")
@@ -193,16 +222,57 @@ class ModalVentasGuardadasTurno:
                 txt_est, col_est, col_fecha = "Pendiente", "#d4ac0d", "#a0a0a0"
 
             nuevo_label(f, txt_est, fuente=("Arial", 11, "bold"), color_texto=col_est, poscicion="center").grid(row=0, column=4, sticky="nsew", pady=8)
-
             nuevo_label(f, vg["texto_pago"], fuente=("Arial", 11, "bold"), color_texto=col_fecha, poscicion="center").grid(row=0, column=5, sticky="nsew", pady=8)
 
             f_btn = nuevo_frame(f, color_fondo="transparent")
             f_btn.grid(row=0, column=6, sticky="nsew", pady=4)
+
+            if estado == "Pendiente":
+                btn_rec = nuevo_boton(
+                    f_btn, "Recuperar",
+                    comando=lambda venta=vg: self.recuperar_en_caja(venta),
+                    color_fondo=COLOR_EXITO if self.caja_abierta else "#444444",
+                    color_hover=COLOR_EXITO_HOVER if self.caja_abierta else "#444444",
+                    ancho=85
+                )
+                if not self.caja_abierta:
+                    btn_rec.configure(state="disabled")
+                btn_rec.pack(side="left", padx=(4, 3), expand=True)
+
             nuevo_boton(
                 f_btn, "Detalles",
                 comando=lambda venta=vg: ModalDetalleVentaIndividual(self.modal, venta, f"Guardada - Ref: {venta['referencia']}"),
-                color_fondo="#1f538d", color_hover="#14375e", ancho=80
-            ).pack(expand=True)
+                color_fondo="#1f538d", color_hover="#14375e", ancho=75
+            ).pack(side="left", padx=(3, 4), expand=True)
+
+    def recuperar_en_caja(self, venta):
+        from bll.gestor_caja import obtener_caja_abierta
+        if not obtener_caja_abierta():
+            self.caja_abierta = False
+            self.renderizar_pagina()
+            return
+
+        toplevels_a_cerrar = list(self.modales_padre)
+        actual = self.modal.master
+        while actual is not None and not hasattr(actual, "mostrar_caja"):
+            if isinstance(actual, ctk.CTkToplevel) and actual not in toplevels_a_cerrar:
+                toplevels_a_cerrar.append(actual)
+            actual = getattr(actual, "master", None)
+
+        ventana_ppal = actual
+
+        self.modal.destroy()
+        for m in toplevels_a_cerrar:
+            try:
+                if m.winfo_exists():
+                    m.destroy()
+            except Exception:
+                pass
+
+        if ventana_ppal and hasattr(ventana_ppal, "mostrar_caja"):
+            ventana_ppal.mostrar_caja()
+            if hasattr(ventana_ppal.vista_actual, "recuperar_venta"):
+                ventana_ppal.after(60, lambda: ventana_ppal.vista_actual.recuperar_venta(venta))
 
 
 class ModalVentasTurno:
@@ -231,7 +301,7 @@ class ModalVentasTurno:
         nuevo_boton(
             frame_top,
             f"Ventas Guardadas ({len(ventas_guardadas)})",
-            comando=lambda: ModalVentasGuardadasTurno(self.modal, self.caja, self.ventas_guardadas),
+            comando=lambda: ModalVentasGuardadasTurno(self.modal, self.caja, self.ventas_guardadas, modales_padre=[self.modal]),
             color_fondo="#db4e17",
             color_hover="#922F10",
             ancho=190

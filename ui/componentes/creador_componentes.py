@@ -33,12 +33,12 @@ def nuevo_label(master, texto, fuente=FUENTE_NORMAL, color_texto=None, poscicion
         width = 0
     )
 
-def nueva_caja_texto(master, placeholder = ""):
+def nueva_caja_texto(master, placeholder = "", ancho = 250):
     """Crea una caja de texto"""
     return ctk.CTkEntry(
         master, 
         placeholder_text = placeholder, 
-        width = 250, 
+        width = ancho, 
         state = "normal"
     )
 

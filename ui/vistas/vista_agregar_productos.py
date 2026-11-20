@@ -279,6 +279,11 @@ class VistaAgregarProducto(ConfiguracionComponentes):
                 self.var_paquete.set(False)
                 self.alternar_paquete()
                 self.entry_nombre.focus()
+            
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
+
             else:
                 self.lbl_mensaje.configure(text=mensaje, text_color="red")
 

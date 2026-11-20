@@ -229,6 +229,10 @@ class VistaEditarProducto(ConfiguracionComponentes):
                 self.lbl_valor_codigo.configure(text=nuevo_codigo if nuevo_codigo else "N/A")
                 self.buscar_externamente(nuevo_codigo if nuevo_codigo else nuevo_nombre)
 
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                ventana_ppal.actualizar_contador_notificaciones()
+
     # --- GUARDAR NUEVA INFO EN LA DB (CON VALIDACIÓN DE ROL) ---
     def guardar_cambios(self, event=None):
         if not self.producto_id_actual:
@@ -269,6 +273,9 @@ class VistaEditarProducto(ConfiguracionComponentes):
             if exito:
                 msj = "Cambios guardados." if costo > 0 else "Advertencia: Producto guardado con costo $0."
                 self.reiniciar_pantalla(msj, "#d4ac0d" if costo == 0 else COLOR_EXITO)
+                ventana_ppal = self.winfo_toplevel()
+                if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
+                    ventana_ppal.actualizar_contador_notificaciones()
             else:
                 self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 

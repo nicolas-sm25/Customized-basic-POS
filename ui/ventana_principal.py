@@ -15,10 +15,12 @@ from ui.vistas.vista_editar_producto import VistaEditarProducto
 from ui.vistas.vista_inventario import VistaInventario
 from ui.vistas.vista_historial import VistaHistorial
 from ui.vistas.vista_configuracion import VistaConfiguracion
+from ui.vistas.vista_notificaciones import VistaNotificaciones
 
 from ui.modales.modal_login import ModalLogin
 
 from bll.gestor_caja import obtener_caja_abierta, verificar_cierre_inesperado
+from bll.gestor_notificaciones import sincronizar_notificaciones_sistema, contar_notificaciones_activas
 
 class VentanaPrincipal(ctk.CTk):
     def __init__(self, nombre_tienda= "TIENDA"):
@@ -47,12 +49,14 @@ class VentanaPrincipal(ctk.CTk):
         self.vista_actual = None 
 
         verificar_cierre_inesperado()
+        sincronizar_notificaciones_sistema(reiniciar_ignoradas=True)
 
         # Lanzar modal de login al abrir la app
         self.after(100, lambda: ModalLogin(self, self.iniciar_sesion_exitoso))
 
     def iniciar_sesion_exitoso(self, usuario):
         self.usuario_actual = usuario
+        sincronizar_notificaciones_sistema(reiniciar_ignoradas=True)
         self.construir_menu()
         self.mostrar_caja()
 
@@ -61,6 +65,7 @@ class VentanaPrincipal(ctk.CTk):
             widget.destroy()
 
         self.frame_menu.grid_rowconfigure(8, weight=1)
+        self.frame_menu.grid_rowconfigure(9, weight=1)
 
         try:
             pngs = [f for f in os.listdir(CARPETA_IMAGENES) if f.lower().endswith('.png')]
@@ -111,10 +116,23 @@ class VentanaPrincipal(ctk.CTk):
             
             self.btn_historial = nuevo_boton(self.frame_menu, "Historial", comando=self.mostrar_historial)
             self.btn_historial.grid(row=7, column=0, padx=20, pady=8)
-        
-        self.btn_config = nuevo_boton(self.frame_menu, "Configuración", 
-        comando=self.mostrar_configuracion,color_fondo="#3b3b3b", color_hover="#555555")
-        self.btn_config.grid(row=8, column=0, padx=20, pady=15)
+    
+        self.btn_notificaciones = nuevo_boton(
+            self.frame_menu,
+            "Notificaciones (0)",
+            comando=self.mostrar_notificaciones,
+            color_fondo="#cc1111",
+            color_hover="#9e0d0d"
+        )
+        self.btn_notificaciones.grid(row=8, column=0, padx=20, pady=10)
+
+        self.btn_config = nuevo_boton(
+            self.frame_menu, "Configuración", 
+            comando=self.mostrar_configuracion,
+            color_fondo="#797777", color_hover="#646363"
+        )
+        self.btn_config.grid(row=9, column=0, padx=20, pady=15)
+        self.actualizar_contador_notificaciones()
 
     def cambiar_vista(self, nueva_vista_clase):
 
@@ -126,6 +144,7 @@ class VentanaPrincipal(ctk.CTk):
             
         self.vista_actual = nueva_vista_clase(self.frame_contenido)
         self.vista_actual.pack(fill="both", expand=True, padx=20, pady=20)
+        self.actualizar_contador_notificaciones()
 
     def mostrar_caja(self): self.cambiar_vista(VistaCaja)
     def mostrar_agregar(self): self.cambiar_vista(VistaAgregarProducto)
@@ -135,8 +154,15 @@ class VentanaPrincipal(ctk.CTk):
             self.after(10, lambda: self.vista_actual.buscar_externamente(criterio_busqueda))
     def mostrar_inventario(self): self.cambiar_vista(VistaInventario)
     def mostrar_historial(self): self.cambiar_vista(VistaHistorial)
-    
-    # --- MENÚ CONFIGURACIÓN ---
+
+    def mostrar_notificaciones(self):
+        self.cambiar_vista(VistaNotificaciones)
+
+    def actualizar_contador_notificaciones(self):
+        if hasattr(self, "btn_notificaciones"):
+            total = contar_notificaciones_activas()
+            self.btn_notificaciones.configure(text=f"Notificaciones ({total})")
+
     def mostrar_configuracion(self):
         if self.vista_actual:
             self.vista_actual.destroy()

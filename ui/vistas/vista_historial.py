@@ -193,3 +193,15 @@ class VistaHistorial(ConfiguracionComponentes):
                     self.cargar_historial()
 
             ModalCierreCaja(self.winfo_toplevel(), caja['id'], confirmar_auditoria)
+
+    def abrir_guardadas_de_turno(self, caja, venta_resaltada_id=None):
+        from bll.gestor_caja import obtener_detalles_turno
+        from ui.modales.modal_detalles_caja import ModalVentasGuardadasTurno
+
+        _, ventas_guardadas, _ = obtener_detalles_turno(caja["id"])
+        ModalVentasGuardadasTurno(
+            self.winfo_toplevel(),
+            caja,
+            ventas_guardadas,
+            venta_resaltada_id=venta_resaltada_id
+        )

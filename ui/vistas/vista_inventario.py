@@ -235,4 +235,8 @@ class VistaInventario(ConfiguracionComponentes):
 
     def ejecutar_cambio_estado(self, producto_id, es_activacion):
         exito, mensaje = reactivar_producto_db(producto_id) if es_activacion else desactivar_producto_db(producto_id)
-        if exito: self.cargar_inventario()
+        if exito: 
+            self.cargar_inventario()
+            ventana_ppal = self.winfo_toplevel()
+            if hasattr(ventana_ppal, "actualizar_contador_notificaciones"): 
+                ventana_ppal.actualizar_contador_notificaciones()
