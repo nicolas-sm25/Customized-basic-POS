@@ -66,27 +66,100 @@ def cerrar_caja():
 from dal.modelos.contabilidad_caja import GastoCaja
 from dal.modelos.ventas import Venta
 
-def registrar_gasto(caja_id, descripcion, monto):
+def registrar_gasto(caja_id, descripcion, monto, tipo_gasto="Dinero", producto_id=None, cantidad_descontada=0):
+    """Registra una salida de dinero o una baja de inventario (merma) descontando stock."""
+    from dal.modelos.productos import Producto
     sesion = SessionLocal()
     try:
-        caja = sesion.query(ContabilidadCaja).filter(ContabilidadCaja.id == caja_id).first()
-        if not caja:
-            return False, "Caja no encontrada."
-            
-        nuevo_gasto = GastoCaja(caja_id=caja_id, descripcion=descripcion, monto=monto)
-        caja.gastos_totales += monto
-        
+        nuevo_gasto = GastoCaja(
+            caja_id=caja_id,
+            descripcion=descripcion,
+            monto=monto,
+            tipo_gasto=tipo_gasto,
+            producto_id=producto_id if tipo_gasto == "Inventario" else None,
+            cantidad_descontada=cantidad_descontada if tipo_gasto == "Inventario" else None
+        )
         sesion.add(nuevo_gasto)
+
+        if tipo_gasto == "Inventario" and producto_id:
+            producto = sesion.query(Producto).filter(Producto.id == producto_id).first()
+            if not producto:
+                sesion.rollback()
+                return False, "El producto seleccionado no existe."
+            
+            if getattr(producto, 'es_paquete', False) and getattr(producto, 'producto_base_id', None):
+                base = sesion.query(Producto).filter(Producto.id == producto.producto_base_id).first()
+                if base:
+                    base.stock -= (cantidad_descontada * producto.cantidad_por_paquete)
+                    producto.stock = base.stock // producto.cantidad_por_paquete
+            else:
+                producto.stock -= cantidad_descontada
+                derivados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
+                for d in derivados:
+                    if d.cantidad_por_paquete > 0:
+                        d.stock = producto.stock // d.cantidad_por_paquete
+
+        caja = sesion.query(ContabilidadCaja).filter(ContabilidadCaja.id == caja_id).first()
+        if caja:
+            if tipo_gasto == "Dinero":
+                caja.gastos_totales += monto
+
         sesion.commit()
-        return True, "Gasto registrado."
+        msg = "Gasto registrado correctamente." if tipo_gasto == "Dinero" else "Baja de inventario registrada."
+        return True, msg
     except Exception as e:
         sesion.rollback()
-        return False, str(e)
+        return False, f"Error al registrar gasto: {e}"
+    finally:
+        sesion.close()
+        
+def registrar_mermas_lote(caja_id, descripcion, items_merma):
+    """Registra múltiples bajas de inventario (mermas) en una sola transacción."""
+    from dal.modelos.productos import Producto
+    sesion = SessionLocal()
+    try:
+        for item in items_merma:
+            prod_id = item["id"]
+            cant = item["cantidad"]
+            costo_perdido = item["subtotal"]
+
+            nuevo_gasto = GastoCaja(
+                caja_id=caja_id,
+                descripcion=descripcion,
+                tipo_gasto="Inventario",
+                monto=costo_perdido,
+                producto_id=prod_id,
+                cantidad_descontada=cant
+            )
+            sesion.add(nuevo_gasto)
+
+            producto = sesion.query(Producto).filter(Producto.id == prod_id).first()
+            if not producto:
+                sesion.rollback()
+                return False, f"El producto '{item['nombre']}' no existe."
+
+            if getattr(producto, 'es_paquete', False) and getattr(producto, 'producto_base_id', None):
+                base = sesion.query(Producto).filter(Producto.id == producto.producto_base_id).first()
+                if base:
+                    base.stock -= (cant * producto.cantidad_por_paquete)
+                    producto.stock = base.stock // producto.cantidad_por_paquete
+            else:
+                producto.stock -= cant
+                derivados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
+                for d in derivados:
+                    if d.cantidad_por_paquete > 0:
+                        d.stock = producto.stock // d.cantidad_por_paquete
+
+        sesion.commit()
+        return True, "Baja de inventario registrada correctamente."
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error al registrar baja de inventario: {e}"
     finally:
         sesion.close()
 
 def obtener_resumen_caja(caja_id):
-    """Devuelve los totales calculados antes de cerrar la caja."""
+    """Devuelve los totales calculados de cualquier caja (abierta o cerrada)."""
     sesion = SessionLocal()
     try:
         caja = sesion.query(ContabilidadCaja).filter(ContabilidadCaja.id == caja_id).first()
@@ -114,7 +187,10 @@ def obtener_resumen_caja(caja_id):
             "ganancia_nequi": ganancia_nequi,
             "ganancia_bruta": ganancia_bruta,
             "ganancia_neta": ganancia_bruta - caja.gastos_totales,
-            "efectivo_esperado": caja.base_efectivo + caja.ventas_efectivo - caja.gastos_totales
+            "efectivo_esperado": caja.base_efectivo + caja.ventas_efectivo - caja.gastos_totales,
+            "efectivo_cierre": caja.total_efectivo_cierre,
+            "diferencia": caja.diferencia if caja.diferencia is not None else 0,
+            "abierta": caja.abierta
         }
     finally:
         sesion.close()
@@ -166,6 +242,130 @@ def obtener_historial_cajas():
                 "ganancia_neta": ganancia_bruta - c.gastos_totales,
                 "diferencia": c.diferencia if c.diferencia is not None else 0,
                 "estado": "Abierta" if c.abierta else "Cerrada"
+            })
+        return resultado
+    finally:
+        sesion.close()
+
+def obtener_detalles_turno(caja_id):
+    """Retorna (ventas_pagadas, ventas_guardadas, gastos) de una caja específica."""
+    from dal.modelos.ventas import Venta
+    sesion = SessionLocal()
+    try:
+        ventas_db = sesion.query(Venta).filter(
+            Venta.caja_id == caja_id,
+            Venta.pagado == True
+        ).order_by(Venta.fecha_hora.desc()).all()
+
+        guardadas_db = sesion.query(Venta).filter(
+            Venta.caja_id == caja_id,
+            Venta.pagado == False
+        ).order_by(Venta.fecha_hora.desc()).all()
+
+        gastos_db = sesion.query(GastoCaja).filter(
+            GastoCaja.caja_id == caja_id
+        ).order_by(GastoCaja.fecha_hora.desc()).all()
+
+        ventas = []
+        for v in ventas_db:
+            detalles_lista = [{
+                "producto": d.producto.nombre if d.producto else f"Producto #{d.producto_id}",
+                "cantidad": d.cantidad,
+                "precio_unitario": d.precio_unitario,
+                "subtotal": d.subtotal
+            } for d in v.detalles]
+
+            es_guardada_anterior = False
+            fecha_guardada = None
+            referencia_guardada = None
+
+            if v.referencia and v.referencia.startswith("GUARDADA|"):
+                partes = v.referencia.split("|", 3)
+                if len(partes) == 4:
+                    es_guardada_anterior = True
+                    fecha_guardada = partes[2]
+                    referencia_guardada = partes[3]
+
+            ventas.append({
+                "id": v.id,
+                "hora": v.fecha_hora.strftime("%I:%M %p"),
+                "metodo_pago": v.metodo_pago or "Efectivo",
+                "cantidad_articulos": sum(d.cantidad for d in v.detalles),
+                "total": v.total,
+                "ganancia": v.ganancia_total,
+                "es_guardada_anterior": es_guardada_anterior,
+                "fecha_guardada": fecha_guardada,
+                "referencia_guardada": referencia_guardada,
+                "detalles": detalles_lista
+            })
+
+        ventas_guardadas = []
+        for vg in guardadas_db:
+            detalles_lista = [{
+                "producto": d.producto.nombre if d.producto else f"Producto #{d.producto_id}",
+                "cantidad": d.cantidad,
+                "precio_unitario": d.precio_unitario,
+                "subtotal": d.subtotal
+            } for d in vg.detalles]
+
+            metodo = vg.metodo_pago or "Pendiente"
+            if metodo.startswith("Eliminada"):
+                estado_guardada = "Eliminada"
+                if "|" in metodo:
+                    fecha_elim = metodo.split("|", 1)[1]
+                    texto_pago = f"Eliminada el {fecha_elim}"
+                else:
+                    texto_pago = "Eliminada"
+            elif metodo.startswith("Pagada|"):
+                estado_guardada = "Pagado"
+                fecha_pago = metodo.split("|", 1)[1]
+                texto_pago = f"Pagada el {fecha_pago}"
+            else:
+                estado_guardada = "Pendiente"
+                texto_pago = ""
+
+            ventas_guardadas.append({
+                "id": vg.id,
+                "hora": vg.fecha_hora.strftime("%I:%M %p"),
+                "referencia": vg.referencia or "Sin referencia",
+                "estado": estado_guardada,
+                "texto_pago": texto_pago,
+                "cantidad_articulos": sum(d.cantidad for d in vg.detalles),
+                "total": vg.total,
+                "detalles": detalles_lista
+            })
+
+        gastos = [{
+            "id": g.id,
+            "hora": g.fecha_hora.strftime("%I:%M %p"),
+            "tipo": g.tipo_gasto or "Dinero",
+            "descripcion": g.descripcion,
+            "monto": g.monto,
+            "producto": g.producto.nombre if g.producto else None,
+            "cantidad": g.cantidad_descontada
+        } for g in gastos_db]
+
+        return ventas, ventas_guardadas, gastos
+    finally:
+        sesion.close()
+
+def obtener_todos_los_gastos():
+    """Retorna el historial global de todos los gastos y mermas registrados."""
+    sesion = SessionLocal()
+    try:
+        gastos_db = sesion.query(GastoCaja).order_by(GastoCaja.fecha_hora.desc()).all()
+        resultado = []
+        for g in gastos_db:
+            encargado = g.caja.usuario.nombre if (g.caja and g.caja.usuario) else "Desconocido"
+            resultado.append({
+                "id": g.id,
+                "fecha_hora": g.fecha_hora.strftime("%d-%m-%Y %I:%M %p"),
+                "encargado": encargado,
+                "tipo": g.tipo_gasto or "Dinero",
+                "descripcion": g.descripcion,
+                "producto": g.producto.nombre if g.producto else "-",
+                "cantidad": g.cantidad_descontada if g.cantidad_descontada else "-",
+                "monto": g.monto
             })
         return resultado
     finally:

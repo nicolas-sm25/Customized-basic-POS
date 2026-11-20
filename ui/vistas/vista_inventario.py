@@ -25,6 +25,7 @@ class VistaInventario(ConfiguracionComponentes):
         self.entry_busqueda = nueva_caja_texto(self.frame_busqueda, placeholder="Buscar en inventario (Cod/Nombre)...")
         self.entry_busqueda.pack(side="left", fill="x", expand=True)
         self.entry_busqueda.bind("<Return>", self.ejecutar_busqueda)
+        self.after(5, self.entry_busqueda.focus)
         
         self.btn_buscar_reset = nuevo_boton(self.frame_busqueda, "Buscar", comando=self.ejecutar_busqueda, ancho=80, color_fondo="#1f538d", color_hover="#14375e")
         self.btn_buscar_reset.pack(side="left", padx=5)

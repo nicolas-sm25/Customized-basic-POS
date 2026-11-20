@@ -33,7 +33,11 @@ class GastoCaja(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     caja_id = Column(Integer, ForeignKey('contabilidad_caja.id'), nullable=False)
     descripcion = Column(String, nullable=False)
+    tipo_gasto = Column(String, default="Dinero")
     monto = Column(Float, nullable=False)
+    producto_id = Column(Integer, ForeignKey('productos.id'), nullable=True)
+    cantidad_descontada = Column(Integer, nullable=True)
     fecha_hora = Column(DateTime, default=datetime.now)
     
     caja = relationship("ContabilidadCaja", back_populates="gastos")
+    producto = relationship("Producto")

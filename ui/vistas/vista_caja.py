@@ -8,6 +8,7 @@ from ui.componentes.creador_componentes import *
 # Modales/Pop-ups
 from ui.modales.modal_cobro import ModalCobro
 from ui.modales.modal_guardar import ModalGuardar
+from ui.modales.modal_cierre_caja import ModalCierreCaja
 # Paneles
 from ui.vistas.secciones.panel_carrito import PanelCarrito
 from ui.vistas.secciones.panel_recibo import PanelRecibo
@@ -235,6 +236,11 @@ class VistaCaja(ConfiguracionComponentes):
 
     def procesar_guardar(self, referencia, modal_referencia):
         """Envía los datos al BLL y muestra el éxito en la UI."""
+        origen = getattr(self, 'venta_guardada_origen', None)
+        if origen:
+            eliminar_venta_pendiente(origen["id"])
+            self.venta_guardada_origen = None
+
         exito, mensaje = registrar_venta(
             carrito=self.panel_carrito.items,
             metodo_pago="Pendiente",
@@ -250,7 +256,6 @@ class VistaCaja(ConfiguracionComponentes):
             modal_referencia.cerrar_modal()
             self.actualizar_contador_guardadas()
             
-            # --- MENSAJE DE ÉXITO ---
             self.entry_buscar_prod.delete(0, 'end')
             self.entry_buscar_prod.configure(placeholder_text=f"¡Guardado!, referencia: {referencia}", placeholder_text_color=COLOR_EXITO)
 
@@ -273,19 +278,29 @@ class VistaCaja(ConfiguracionComponentes):
         else:
             self.entry_buscar_prod.configure(placeholder_text="Error al registrar gasto", placeholder_text_color=COLOR_FALLO)
         self.after(2000, lambda: self.entry_buscar_prod.configure(placeholder_text="Código de Barras o Nombre...", placeholder_text_color="gray"))
-        self.after(1, lambda: [self.entry_buscar_prod.focus()])
 
     # --- POP-UP PEDIDOS GUARDADOS ---
     def abrir_modal_ver_guardadas(self):
         from ui.modales.modal_ventas_guardadas import ModalVentasGuardadas
+        if getattr(self, 'venta_guardada_origen', None) and not self.panel_carrito.items:
+            self.venta_guardada_origen = None
+
         ventas_pendientes = obtener_ventas_pendientes()
+        origen = getattr(self, 'venta_guardada_origen', None)
+        if origen:
+            ventas_pendientes = [v for v in ventas_pendientes if v["id"] != origen["id"]]
+
         ModalVentasGuardadas(self, ventas_pendientes, self.recuperar_venta, self.eliminar_venta_guardada)
 
     def recuperar_venta(self, venta):
         self.panel_carrito.vaciar()
         self.panel_carrito.cargar_items(venta["items"])
         self.cliente_actual = venta["cliente"]
-        eliminar_venta_pendiente(venta["id"])
+        self.venta_guardada_origen = {
+            "id": venta["id"],
+            "cliente": venta["cliente"],
+            "fecha_solo": venta.get("fecha_solo", venta["fecha"].split(" ")[0].replace("/", "-"))
+        }
         self.actualizar_contador_guardadas()
         
         self.entry_buscar_prod.delete(0, 'end')
@@ -298,12 +313,13 @@ class VistaCaja(ConfiguracionComponentes):
         ])
 
     def eliminar_venta_guardada(self, venta_id):
-        exito = eliminar_venta_pendiente(venta_id)
+        from bll.gestor_ventas import registrar_perdida_venta_guardada
+        exito, _ = registrar_perdida_venta_guardada(venta_id, self.caja_activa_id)
         if exito:
-            self.entry_buscar_prod.configure(placeholder_text="¡Pedido eliminado!", placeholder_text_color=COLOR_EXITO)
+            self.entry_buscar_prod.configure(placeholder_text="¡Pedido eliminado y registrado como pérdida!", placeholder_text_color="#d4ac0d")
             self.actualizar_contador_guardadas()
         else:
-            self.entry_buscar_prod.configure(placeholder_text="Error al eliminar", placeholder_text_color=COLOR_FALLO)
+            self.entry_buscar_prod.configure(placeholder_text="Error al registrar pérdida", placeholder_text_color=COLOR_FALLO)
         
         self.after(2000, lambda: [
             self.focus(), 
@@ -321,9 +337,7 @@ class VistaCaja(ConfiguracionComponentes):
                 self.entry_buscar_prod.focus()
             ])
             return
-
-        from ui.modales.modal_cierre import ModalCierre
-        ModalCierre(self, self.caja_activa_id, self.ejecutar_cierre)
+        ModalCierreCaja(self, self.caja_activa_id, self.ejecutar_cierre)
     
     def ejecutar_cierre(self, efectivo_fisico, diferencia):
         from bll.gestor_caja import cerrar_caja_definitiva
@@ -361,22 +375,22 @@ class VistaCaja(ConfiguracionComponentes):
     def procesar_cobro(self, metodo_pago, modal_referencia, entregado=0, vueltas=0):
         """Envía los items guardados en el gestor al BLL y muestra las vueltas."""
         items_carrito = self.panel_carrito.items
-        
         if not items_carrito:
             return
 
         total_venta = sum(item['subtotal'] for item in items_carrito)
+        origen = getattr(self, 'venta_guardada_origen', None)
 
         exito, mensaje = registrar_venta(
             carrito=items_carrito, 
             metodo_pago=metodo_pago, 
-            caja_id=self.caja_activa_id
+            caja_id=self.caja_activa_id,
+            venta_guardada_origen=origen
         )
 
         if exito:
             cliente_venta = getattr(self, 'cliente_actual', None)
 
-            # Enviar datos al mini recibo
             self.panel_recibo.actualizar_recibo(
                 items=items_carrito,
                 total=total_venta,
@@ -393,6 +407,7 @@ class VistaCaja(ConfiguracionComponentes):
             
             if hasattr(self, 'cliente_actual'):
                 del self.cliente_actual
+            self.venta_guardada_origen = None
 
             self.entry_buscar_prod.delete(0, 'end')
             self.entry_buscar_prod.configure(placeholder_text="¡Venta Exitosa!", placeholder_text_color=COLOR_EXITO)
@@ -407,7 +422,14 @@ class VistaCaja(ConfiguracionComponentes):
 
     def actualizar_contador_guardadas(self):
         """Consulta la base de datos y actualiza el número en el botón."""
+        if getattr(self, 'venta_guardada_origen', None) and not self.panel_carrito.items:
+            self.venta_guardada_origen = None
+
         pendientes = obtener_ventas_pendientes()
+        origen = getattr(self, 'venta_guardada_origen', None)
+        if origen:
+            pendientes = [v for v in pendientes if v["id"] != origen["id"]]
+
         self.btn_ver_guardadas.configure(text=f"Ver Ventas Guardadas ({len(pendientes)})")
 
     def resultado_autocompletado(self, producto):

@@ -2,20 +2,24 @@ import customtkinter as ctk
 from ui.componentes.creador_componentes import *
 
 class ModalConfirmacionEliminarVenta:
-    """Sub-modal exclusivo y coherente para eliminar un pedido."""
+    """Sub-modal para eliminar un pedido y registrarlo como pérdida."""
     def __init__(self, master, cliente, callback_confirmar):
-        self.modal = nuevo_modal(master, "Eliminar Pedido", 420, 220)
+        self.modal = nuevo_modal(master, "Eliminar Pedido", 440, 230)
 
         f = nuevo_frame(self.modal)
         f.pack(expand=True, fill="both", padx=20, pady=20)
         
-        nuevo_label(f, f"¿Eliminar definitivamente el\npedido de '{cliente}'?", fuente=FUENTE_TITULOS).pack(pady=15)
+        nuevo_label(
+            f,
+            f"¿Eliminar el pedido de '{cliente}'?\nSe registrará automáticamente como pérdida.",
+            fuente=("Arial", 15, "bold")
+        ).pack(pady=15)
         
         fb = nuevo_frame(f, color_fondo="transparent")
         fb.pack(pady=10)
 
         nuevo_boton(fb, "Cancelar (Esc)", comando=self.modal.destroy, color_fondo="#555555", color_hover="#777777").grid(row=0, column=0, padx=10)
-        nuevo_boton(fb, "Sí, Eliminar (Enter)", comando=lambda: [self.modal.destroy(), callback_confirmar()], color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER).grid(row=0, column=1, padx=10)
+        nuevo_boton(fb, "Sí, Registrar Pérdida (Enter)", comando=lambda: [self.modal.destroy(), callback_confirmar()], color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER).grid(row=0, column=1, padx=10)
         
         self.modal.bind("<Escape>", lambda e: self.modal.destroy())
         self.modal.bind("<Return>", lambda e: [self.modal.destroy(), callback_confirmar()])

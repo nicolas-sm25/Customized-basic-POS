@@ -3,7 +3,7 @@ from ui.componentes.creador_componentes import *
 from bll.gestor_caja import obtener_resumen_caja
 from bll.gestor_ventas import obtener_ventas_pendientes
 
-class ModalCierre:
+class ModalCierreCaja:
     def __init__(self, master, caja_id, callback_confirmar):
         self.master = master
         self.modal = nuevo_modal(master, "Resumen y Cierre de Caja", 550, 720)
@@ -19,7 +19,7 @@ class ModalCierre:
         if not resumen:
             nuevo_label(frame_modal, "Error al cargar resumen.", color_texto=COLOR_FALLO).pack()
             return
-            
+
         # --- TABLA DE RENDIMIENTO DESGLOSADA ---
         f_stats = nuevo_frame(frame_modal, color_fondo="#2b2b2b", radio_esquinas=10)
         f_stats.pack(fill="x", pady=10, padx=10)
