@@ -6,22 +6,18 @@ from dal.modelos.base import Base
 
 # --- DETECCIÓN DE RUTA ABSOLUTA ---
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    app_data = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    CARPETA_DATOS = os.path.join(app_data, "POS_Tienda", "datos")
 else:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    CARPETA_DATOS = os.path.join(BASE_DIR, "datos")
 
-# Ruta hacia 'datos'
-CARPETA_DATOS = os.path.join(BASE_DIR, "datos")
 CARPETA_CONFIG = os.path.join(CARPETA_DATOS, "configuraciones")
 CARPETA_IMAGENES = os.path.join(CARPETA_DATOS, "imagenes")
 
-# Carpeta exista junto al .exe o al script
-if not os.path.exists(CARPETA_DATOS):
-    os.makedirs(CARPETA_DATOS)
-
+# Crear estructura de carpetas con permisos de usuario normal
 os.makedirs(CARPETA_CONFIG, exist_ok=True)
 os.makedirs(CARPETA_IMAGENES, exist_ok=True)
-
 
 # Ruta absoluta del archivo de la base de datos
 RUTA_DB = os.path.join(CARPETA_CONFIG, "base_datos_tienda.db")

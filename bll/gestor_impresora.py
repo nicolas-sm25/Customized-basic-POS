@@ -77,6 +77,12 @@ def cargar_config_impresora():
     """Retorna únicamente el diccionario de configuración de la impresora."""
     return cargar_config_completa()["impresora"]
 
+def impresora_esta_configurada():
+    """Retorna True si hay una impresora seleccionada y el modo no está desactivado."""
+    cfg_imp = cargar_config_impresora()
+    nombre = (cfg_imp.get("nombre_impresora") or "").strip()
+    modo = cfg_imp.get("modo", "desactivada")
+    return bool(nombre) and nombre != "Sin impresora" and modo != "desactivada"
 
 def guardar_config_impresora(datos_impresora):
     """Guarda los ajustes de la impresora en config.json sin alterar nombre_tienda."""

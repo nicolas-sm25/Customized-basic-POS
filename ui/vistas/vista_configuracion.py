@@ -416,6 +416,10 @@ class VistaConfiguracion(ConfiguracionComponentes):
         exito, msg = guardar_config_impresora(datos)
         self.lbl_mensaje_impresora.configure(text=msg, text_color=COLOR_EXITO if exito else COLOR_FALLO)
 
+        ventana = self.winfo_toplevel()
+        if hasattr(ventana, "actualizar_estado_boton_cajon"):
+            ventana.actualizar_estado_boton_cajon()
+
     def probar_cajon_ui(self):
         datos = self._recoger_datos_impresora_ui()
         exito, msg = abrir_cajon_monedero(forzar_manual=True, nombre_impresora_override=datos["nombre_impresora"])

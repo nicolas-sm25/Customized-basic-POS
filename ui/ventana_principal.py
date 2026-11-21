@@ -5,7 +5,8 @@ from PIL import Image
 
 import os
 
-from dal.conexion_DB import CARPETA_IMAGENES
+from dal.conexion_DB import CARPETA_IMAGENES, SessionLocal
+from dal.modelos.usuarios import Usuario
 
 from ui.componentes.creador_componentes import *
 
@@ -19,10 +20,12 @@ from ui.vistas.vista_notificaciones import VistaNotificaciones
 from ui.vistas.vista_proveedores import VistaProveedores
 
 from ui.modales.modal_login import ModalLogin
+from ui.modales.modal_bienvenida import ModalBienvenidaAdmin
 
 from bll.gestor_caja import obtener_caja_abierta, verificar_cierre_inesperado
 from bll.gestor_notificaciones import sincronizar_notificaciones_sistema, contar_notificaciones_activas
-from bll.gestor_impresora import abrir_cajon_monedero
+from bll.gestor_impresora import abrir_cajon_monedero, impresora_esta_configurada
+from bll.gestor_usuarios import hay_usuarios_registrados
 
 class VentanaPrincipal(ctk.CTk):
     def __init__(self, nombre_tienda= "TIENDA"):
@@ -58,7 +61,13 @@ class VentanaPrincipal(ctk.CTk):
         sincronizar_notificaciones_sistema(reiniciar_ignoradas=True)
 
         # Lanzar modal de login al abrir la app
-        self.after(100, lambda: ModalLogin(self, self.iniciar_sesion_exitoso))
+        self.after(100, self.verificar_inicio_sesion)
+
+    def verificar_inicio_sesion(self):
+        if hay_usuarios_registrados():
+            ModalLogin(self, self.iniciar_sesion_exitoso)
+        else:
+            ModalBienvenidaAdmin(self, self.iniciar_sesion_exitoso)
 
     def iniciar_sesion_exitoso(self, usuario):
         self.usuario_actual = usuario
@@ -71,7 +80,6 @@ class VentanaPrincipal(ctk.CTk):
             widget.destroy()
 
         self.frame_menu.grid_rowconfigure(9, weight=1)
-        self.frame_menu.grid_rowconfigure(10, weight=1)
         self.frame_menu.grid_rowconfigure(11, weight=1)
 
         try:
@@ -127,15 +135,6 @@ class VentanaPrincipal(ctk.CTk):
             self.btn_proveedores = nuevo_boton(self.frame_menu, "Proveedores", comando=self.mostrar_proveedores)
             self.btn_proveedores.grid(row=8, column=0, padx=20, pady=8)
 
-        self.btn_abrir_cajon = nuevo_boton(
-            self.frame_menu,
-            "Abrir Cajón",
-            comando=self.accion_abrir_cajon,
-            color_fondo="#078d3a",
-            color_hover="#054d20"
-        )
-        self.btn_abrir_cajon.grid(row=9, column=0, padx=20, pady=8)
-
         self.btn_notificaciones = nuevo_boton(
             self.frame_menu,
             "Notificaciones (0)",
@@ -143,14 +142,24 @@ class VentanaPrincipal(ctk.CTk):
             color_fondo="#cc1111",
             color_hover="#9e0d0d"
         )
-        self.btn_notificaciones.grid(row=10, column=0, padx=20, pady=10)
+        self.btn_notificaciones.grid(row=9, column=0, padx=20, pady=8)
+
+        self.btn_abrir_cajon = nuevo_boton(
+                    self.frame_menu,
+                    "Abrir Cajón",
+                    comando=self.accion_abrir_cajon,
+                    color_fondo="#078d3a",
+                    color_hover="#054d20"
+                )
+        self.btn_abrir_cajon.grid(row=10, column=0, padx=20, pady=(0, 8))
 
         self.btn_config = nuevo_boton(
             self.frame_menu, "Configuración", 
             comando=self.mostrar_configuracion,
             color_fondo="#797777", color_hover="#646363"
         )
-        self.btn_config.grid(row=11, column=0, padx=20, pady=15)
+        self.btn_config.grid(row=11, column=0, padx=20, pady=(8, 18))
+
         self.actualizar_contador_notificaciones()
         self.actualizar_estado_boton_cajon()
 
@@ -177,13 +186,20 @@ class VentanaPrincipal(ctk.CTk):
     def mostrar_proveedores(self): self.cambiar_vista(VistaProveedores)
     
     def actualizar_estado_boton_cajon(self):
-        """Habilita 'Abrir Cajón' si hay una caja abierta o si el usuario es Administrador."""
+        """Muestra 'Abrir Cajón' solo si la impresora está configurada y activa; de lo contrario lo oculta."""
         if not hasattr(self, "btn_abrir_cajon") or not self.btn_abrir_cajon.winfo_exists():
             return
+
+        if not impresora_esta_configurada():
+            self.btn_abrir_cajon.grid_remove()
+            return
+
+        self.btn_abrir_cajon.grid(row=10, column=0, padx=20, pady=(0, 8))
+
         es_admin = (self.usuario_actual or {}).get("rol") == "Administrador"
         hay_caja = obtener_caja_abierta() is not None
         if es_admin or hay_caja:
-            self.btn_abrir_cajon.configure(state="normal", fg_color="#0bac49", hover_color="#054d20")
+            self.btn_abrir_cajon.configure(state="normal", fg_color="#078d3a", hover_color="#054d20")
         else:
             self.btn_abrir_cajon.configure(state="disabled", fg_color="#3a3a3a")
 

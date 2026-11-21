@@ -1,11 +1,16 @@
 from dal.conexion_DB import SessionLocal
 from dal.modelos.usuarios import Usuario
 
+
 def verificar_credenciales(username, password):
     """Verifica usuario y contraseña, devuelve el diccionario del usuario si es correcto."""
     sesion = SessionLocal()
     try:
-        user = sesion.query(Usuario).filter(Usuario.username == username, Usuario.password == password, Usuario.activo == True).first()
+        user = sesion.query(Usuario).filter(
+            Usuario.username == username,
+            Usuario.password == password,
+            Usuario.activo == True
+        ).first()
         if user:
             return {
                 "id": user.id,
@@ -17,42 +22,89 @@ def verificar_credenciales(username, password):
     finally:
         sesion.close()
 
-def inicializar_usuario_admin():
-    """Crea un usuario administrador por defecto si la tabla está vacía."""
+
+def hay_usuarios_registrados():
+    """Retorna True si existe al menos un usuario en la base de datos."""
     sesion = SessionLocal()
     try:
-        existe = sesion.query(Usuario).first()
-        if not existe:
-            admin_default = Usuario(
-                nombre="Administrador",
-                username="admin",
-                password="123",
-                rol="Administrador"
-            )
-            sesion.add(admin_default)
-            sesion.commit()
+        return sesion.query(Usuario).first() is not None
     finally:
         sesion.close()
+
+
+def crear_usuario(nombre, username, password, rol="Administrador"):
+    """Registra un nuevo usuario en la base de datos y retorna (exito, resultado_o_error)."""
+    sesion = SessionLocal()
+    try:
+        existente = sesion.query(Usuario).filter(Usuario.username == username).first()
+        if existente:
+            return False, "Ese nombre de usuario ya está en uso."
+
+        nuevo = Usuario(
+            nombre=nombre,
+            username=username,
+            password=password,
+            rol=rol
+        )
+        if getattr(nuevo, "activo", None) is None:
+            nuevo.activo = True
+
+        sesion.add(nuevo)
+        sesion.commit()
+        sesion.refresh(nuevo)
+
+        return True, {
+            "id": nuevo.id,
+            "nombre": nuevo.nombre,
+            "username": nuevo.username,
+            "rol": nuevo.rol
+        }
+    except Exception as e:
+        sesion.rollback()
+        return False, f"Error al crear usuario: {str(e)}"
+    finally:
+        sesion.close()
+
 
 def obtener_usuarios():
     sesion = SessionLocal()
     try:
         usuarios = sesion.query(Usuario).all()
-        # Excluimos la contraseña por seguridad al enviarlo a la vista
-        return [{"id": u.id, "nombre": u.nombre, "username": u.username, "rol": u.rol, "activo": u.activo} for u in usuarios]
+        return [
+            {
+                "id": u.id,
+                "nombre": u.nombre,
+                "username": u.username,
+                "rol": u.rol,
+                "activo": u.activo
+            }
+            for u in usuarios
+        ]
     finally:
         sesion.close()
+
 
 def cambiar_estado_usuario(usuario_id, estado_nuevo):
     sesion = SessionLocal()
     try:
         user = sesion.query(Usuario).filter(Usuario.id == usuario_id).first()
-        if user:
-            if user.username == "admin" and not estado_nuevo:
-                return False, "Por seguridad, no se puede deshabilitar al admin principal."
-            user.activo = estado_nuevo
-            sesion.commit()
-            return True, "Estado de usuario actualizado."
-        return False, "Usuario no encontrado."
+        if not user:
+            return False, "Usuario no encontrado."
+
+        if not estado_nuevo:
+            if user.id == 1 or user.username == "admin":
+                return False, "Por seguridad, no se puede deshabilitar al administrador principal."
+
+            if user.rol == "Administrador":
+                admins_activos = sesion.query(Usuario).filter(
+                    Usuario.rol == "Administrador",
+                    Usuario.activo == True
+                ).count()
+                if admins_activos <= 1:
+                    return False, "Debe quedar al menos un Administrador activo en el sistema."
+
+        user.activo = estado_nuevo
+        sesion.commit()
+        return True, "Estado de usuario actualizado."
     finally:
         sesion.close()
