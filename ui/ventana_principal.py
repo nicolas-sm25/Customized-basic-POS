@@ -16,6 +16,7 @@ from ui.vistas.vista_inventario import VistaInventario
 from ui.vistas.vista_historial import VistaHistorial
 from ui.vistas.vista_configuracion import VistaConfiguracion
 from ui.vistas.vista_notificaciones import VistaNotificaciones
+from ui.vistas.vista_proveedores import VistaProveedores
 
 from ui.modales.modal_login import ModalLogin
 
@@ -64,8 +65,8 @@ class VentanaPrincipal(ctk.CTk):
         for widget in self.frame_menu.winfo_children():
             widget.destroy()
 
-        self.frame_menu.grid_rowconfigure(8, weight=1)
         self.frame_menu.grid_rowconfigure(9, weight=1)
+        self.frame_menu.grid_rowconfigure(10, weight=1)
 
         try:
             pngs = [f for f in os.listdir(CARPETA_IMAGENES) if f.lower().endswith('.png')]
@@ -116,6 +117,9 @@ class VentanaPrincipal(ctk.CTk):
             
             self.btn_historial = nuevo_boton(self.frame_menu, "Historial", comando=self.mostrar_historial)
             self.btn_historial.grid(row=7, column=0, padx=20, pady=8)
+            
+            self.btn_proveedores = nuevo_boton(self.frame_menu, "Proveedores", comando=self.mostrar_proveedores)
+            self.btn_proveedores.grid(row=8, column=0, padx=20, pady=8)
     
         self.btn_notificaciones = nuevo_boton(
             self.frame_menu,
@@ -124,14 +128,14 @@ class VentanaPrincipal(ctk.CTk):
             color_fondo="#cc1111",
             color_hover="#9e0d0d"
         )
-        self.btn_notificaciones.grid(row=8, column=0, padx=20, pady=10)
+        self.btn_notificaciones.grid(row=9, column=0, padx=20, pady=10)
 
         self.btn_config = nuevo_boton(
             self.frame_menu, "Configuración", 
             comando=self.mostrar_configuracion,
             color_fondo="#797777", color_hover="#646363"
         )
-        self.btn_config.grid(row=9, column=0, padx=20, pady=15)
+        self.btn_config.grid(row=10, column=0, padx=20, pady=15)
         self.actualizar_contador_notificaciones()
 
     def cambiar_vista(self, nueva_vista_clase):
@@ -154,6 +158,7 @@ class VentanaPrincipal(ctk.CTk):
             self.after(10, lambda: self.vista_actual.buscar_externamente(criterio_busqueda))
     def mostrar_inventario(self): self.cambiar_vista(VistaInventario)
     def mostrar_historial(self): self.cambiar_vista(VistaHistorial)
+    def mostrar_proveedores(self): self.cambiar_vista(VistaProveedores)
 
     def mostrar_notificaciones(self):
         self.cambiar_vista(VistaNotificaciones)

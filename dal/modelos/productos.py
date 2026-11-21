@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from dal.modelos.base import Base
+from dal.modelos.proveedores import Proveedor
 
 class Producto(Base):
     __tablename__ = 'productos'
@@ -15,8 +16,10 @@ class Producto(Base):
     es_paquete = Column(Boolean, default=False)
     producto_base_id = Column(Integer, ForeignKey('productos.id'), nullable=True)
     cantidad_por_paquete = Column(Integer, default=1)
+    proveedor_id = Column(Integer, ForeignKey('proveedores.id'), nullable=True)
 
     producto_base = relationship("Producto", remote_side=[id], backref="paquetes_asociados")
+    proveedor = relationship("Proveedor", back_populates="productos")
 
     def __init__(self, nombre, costo, precio_venta, codigo_barras=None, stock=0, es_paquete=False, producto_base_id=None, cantidad_por_paquete=1):
         self.nombre = nombre
