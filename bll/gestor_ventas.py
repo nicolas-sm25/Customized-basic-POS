@@ -4,10 +4,11 @@ from dal.modelos.productos import Producto
 from dal.modelos.contabilidad_caja import ContabilidadCaja
 from bll.gestor_notificaciones import evaluar_notificaciones_producto, cumplir_notificacion_por_tipo_entidad
 from bll.gestor_productos import ajustar_stock_producto
+from bll.gestor_impresora import procesar_impresion_venta
 from datetime import datetime
 
 
-def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente=None, pagado=True, venta_guardada_origen=None):
+def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente=None, pagado=True, venta_guardada_origen=None, datos_ticket=None):
     """
     Guarda la venta, sus detalles, descuenta inventario y actualiza el saldo de la caja.
     Si proviene de una venta guardada anterior, marca la original como pagada con fecha sin borrarla.
@@ -80,7 +81,20 @@ def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente=None, pagado=T
                     venta_origen_db.metodo_pago = f"Pagada|{fecha_pago_str}"
                     origen_id_pagado = venta_origen_db.id
 
+        venta_id_creada = nueva_venta.id
         sesion.commit()
+
+        if pagado and datos_ticket is not None:
+            procesar_impresion_venta(
+                venta_id=venta_id_creada,
+                items=carrito,
+                total=total_venta,
+                metodo_pago=metodo_pago,
+                recibido=datos_ticket.get("entregado", 0),
+                cambio=datos_ticket.get("vueltas", 0),
+                cajero=datos_ticket.get("cajero", ""),
+                cliente=datos_ticket.get("cliente")
+            )
 
         if origen_id_pagado:
             cumplir_notificacion_por_tipo_entidad("VENTA_ANTIGUA", origen_id_pagado)

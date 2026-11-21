@@ -8,6 +8,14 @@ from ui.componentes.creador_componentes import *
 from ui.modales.modal_usuarios import ModalUsuarios
 from dal.conexion_DB import SessionLocal, CARPETA_CONFIG, CARPETA_IMAGENES
 from dal.modelos.usuarios import Usuario
+from bll.gestor_impresora import (
+    MODOS_IMPRESORA,
+    listar_impresoras_windows,
+    cargar_config_impresora,
+    guardar_config_impresora,
+    abrir_cajon_monedero,
+    imprimir_ticket_prueba
+)
 
 class VistaConfiguracion(ConfiguracionComponentes):
     def __init__(self, master, callback_cerrar_sesion):
@@ -155,6 +163,143 @@ class VistaConfiguracion(ConfiguracionComponentes):
         else:
             nuevo_label(f_tienda, "🔒 Acceso restringido.\nSolo los administradores pueden editar nombre y logo.", fuente=("Arial", 13), color_texto=COLOR_FALLO).pack(pady=30)
 
+        # --- SECCIÓN: IMPRESORA TÉRMICA Y CAJÓN MONEDERO ---
+        nuevo_label(f_contenido, "Impresora Térmica y Cajón Monedero", fuente=("Arial", 16, "bold"), color_texto="#d4ac0d", poscicion="w").pack(anchor="w", pady=(25, 10))
+
+        f_imp = nuevo_frame(f_contenido, color_fondo="#2b2b2b")
+        f_imp.pack(fill="x", pady=5, padx=5)
+
+        if rol_usuario == "Administrador":
+            cfg_imp = cargar_config_impresora()
+
+            f_imp_inner = nuevo_frame(f_imp, color_fondo="transparent")
+            f_imp_inner.pack(fill="x", padx=15, pady=15)
+            f_imp_inner.grid_columnconfigure(1, weight=1)
+
+            # Fila 0: Selección de Impresora Windows + Botón refrescar
+            nuevo_label(f_imp_inner, "Impresora instalada:", fuente=("Arial", 12, "bold"), poscicion="w").grid(row=0, column=0, sticky="w", pady=6, padx=(0, 10))
+
+            f_sel_imp = nuevo_frame(f_imp_inner, color_fondo="transparent")
+            f_sel_imp.grid(row=0, column=1, sticky="ew", pady=6)
+
+            impresoras_win = listar_impresoras_windows()
+            imp_actual = cfg_imp.get("nombre_impresora", "")
+            if imp_actual and imp_actual not in impresoras_win:
+                impresoras_win.insert(0, imp_actual)
+            if not impresoras_win:
+                impresoras_win = ["Sin impresora"]
+
+            self.combo_impresora = ctk.CTkOptionMenu(
+                f_sel_imp,
+                values=impresoras_win,
+                fg_color="#3b3b3b",
+                button_color="#4b4b4b",
+                button_hover_color="#5b5b5b",
+                width=280
+            )
+            self.combo_impresora.set(imp_actual if imp_actual else impresoras_win[0])
+            self.combo_impresora.pack(side="left", fill="x", expand=True)
+
+            nuevo_boton(
+                f_sel_imp,
+                "Actualizar",
+                comando=self.refrescar_lista_impresoras,
+                color_fondo="#3498db",
+                color_hover="#2980b9",
+                ancho=40
+            ).pack(side="left", padx=(8, 0))
+
+            # Fila 1: Modo de Operación (4 opciones)
+            nuevo_label(f_imp_inner, "Modo de operación:", fuente=("Arial", 12, "bold"), poscicion="w").grid(row=1, column=0, sticky="w", pady=6, padx=(0, 10))
+
+            self.mapa_modos_ui = {etiqueta: clave for clave, etiqueta in MODOS_IMPRESORA.items()}
+            modo_guardado = cfg_imp.get("modo", "desactivada")
+            etiqueta_modo_actual = MODOS_IMPRESORA.get(modo_guardado, MODOS_IMPRESORA["desactivada"])
+
+            self.combo_modo_imp = ctk.CTkOptionMenu(
+                f_imp_inner,
+                values=list(MODOS_IMPRESORA.values()),
+                fg_color="#3b3b3b",
+                button_color="#4b4b4b",
+                button_hover_color="#5b5b5b"
+            )
+            self.combo_modo_imp.set(etiqueta_modo_actual)
+            self.combo_modo_imp.grid(row=1, column=1, sticky="ew", pady=6)
+
+            # Fila 2: Ancho de papel
+            nuevo_label(f_imp_inner, "Ancho de papel:", fuente=("Arial", 12, "bold"), poscicion="w").grid(row=2, column=0, sticky="w", pady=6, padx=(0, 10))
+
+            self.combo_ancho_papel = ctk.CTkOptionMenu(
+                f_imp_inner,
+                values=["80 mm (48 columnas - SAT Q23T)", "58 mm (32 columnas)"],
+                fg_color="#3b3b3b",
+                button_color="#4b4b4b",
+                button_hover_color="#5b5b5b"
+            )
+            self.combo_ancho_papel.set("58 mm (32 columnas)" if int(cfg_imp.get("ancho_papel", 48)) == 32 else "80 mm (48 columnas - SAT Q23T)")
+            self.combo_ancho_papel.grid(row=2, column=1, sticky="ew", pady=6)
+
+            # Fila 3: NIT y Teléfono
+            nuevo_label(f_imp_inner, "NIT / Régimen (Opcional):", fuente=("Arial", 12), poscicion="w").grid(row=3, column=0, sticky="w", pady=6, padx=(0, 10))
+            self.entry_imp_nit = nueva_caja_texto(f_imp_inner, placeholder="Ej: 123.456.789-0 - No responsable de IVA")
+            self.entry_imp_nit.insert(0, cfg_imp.get("nit", ""))
+            self.entry_imp_nit.grid(row=3, column=1, sticky="ew", pady=6)
+
+            # Fila 4: Dirección
+            nuevo_label(f_imp_inner, "Dirección (Opcional):", fuente=("Arial", 12), poscicion="w").grid(row=4, column=0, sticky="w", pady=6, padx=(0, 10))
+            self.entry_imp_dir = nueva_caja_texto(f_imp_inner, placeholder="Ej: Cra 10 # 20-30")
+            self.entry_imp_dir.insert(0, cfg_imp.get("direccion", ""))
+            self.entry_imp_dir.grid(row=4, column=1, sticky="ew", pady=6)
+
+            # Fila 5: Teléfono
+            nuevo_label(f_imp_inner, "Teléfono (Opcional):", fuente=("Arial", 12), poscicion="w").grid(row=5, column=0, sticky="w", pady=6, padx=(0, 10))
+            self.entry_imp_tel = nueva_caja_texto(f_imp_inner, placeholder="Ej: 3001234567")
+            self.entry_imp_tel.insert(0, cfg_imp.get("telefono", ""))
+            self.entry_imp_tel.grid(row=5, column=1, sticky="ew", pady=6)
+
+            # Fila 6: Mensaje pie de tirilla
+            nuevo_label(f_imp_inner, "Mensaje pie de recibo:", fuente=("Arial", 12), poscicion="w").grid(row=6, column=0, sticky="w", pady=6, padx=(0, 10))
+            self.entry_imp_pie = nueva_caja_texto(f_imp_inner, placeholder="Ej: ¡Gracias por su compra! Vuelva pronto")
+            self.entry_imp_pie.insert(0, cfg_imp.get("mensaje_pie", ""))
+            self.entry_imp_pie.grid(row=6, column=1, sticky="ew", pady=6)
+
+            # Mensaje estado impresora
+            self.lbl_mensaje_impresora = nuevo_label(f_imp, "", color_texto=COLOR_EXITO)
+            self.lbl_mensaje_impresora.pack(pady=(2, 6))
+
+            # Fila de Botones (Guardar / Probar Cajón / Imprimir Prueba)
+            f_btns_imp = nuevo_frame(f_imp, color_fondo="transparent")
+            f_btns_imp.pack(pady=(0, 15))
+
+            nuevo_boton(
+                f_btns_imp,
+                "Guardar Configuración",
+                comando=self.guardar_ajustes_impresora,
+                color_fondo=COLOR_EXITO,
+                color_hover=COLOR_EXITO_HOVER,
+                ancho=180
+            ).pack(side="left", padx=8)
+
+            nuevo_boton(
+                f_btns_imp,
+                "Probar Cajón",
+                comando=self.probar_cajon_ui,
+                color_fondo="#d4ac0d",
+                color_hover="#b9770e",
+                ancho=140
+            ).pack(side="left", padx=8)
+
+            nuevo_boton(
+                f_btns_imp,
+                "Imprimir Prueba",
+                comando=self.probar_impresion_ui,
+                color_fondo="#3498db",
+                color_hover="#2980b9",
+                ancho=150
+            ).pack(side="left", padx=8)
+        else:
+            nuevo_label(f_imp, "🔒 Acceso restringido.\nSolo los administradores pueden configurar la impresora.", fuente=("Arial", 13), color_texto=COLOR_FALLO).pack(pady=30)
+
     def cambiar_tema(self, nuevo_modo):
         ctk.set_appearance_mode(nuevo_modo)
 
@@ -243,3 +388,46 @@ class VistaConfiguracion(ConfiguracionComponentes):
             self.after(3000, lambda: self.lbl_mensaje_img.configure(text=""))
         except Exception as e:
             self.lbl_mensaje_img.configure(text=f"Error al importar: {e}", text_color=COLOR_FALLO)
+
+    def refrescar_lista_impresoras(self):
+        impresoras = listar_impresoras_windows()
+        if not impresoras:
+            impresoras = ["Sin impresora"]
+        self.combo_impresora.configure(values=impresoras)
+        self.combo_impresora.set(impresoras[0])
+        self.lbl_mensaje_impresora.configure(text="Lista de impresoras actualizada.", text_color="#4fa6ff")
+
+    def _recoger_datos_impresora_ui(self):
+        imp_sel = self.combo_impresora.get()
+        modo_clave = self.mapa_modos_ui.get(self.combo_modo_imp.get(), "desactivada")
+        ancho = 32 if "58 mm" in self.combo_ancho_papel.get() else 48
+        return {
+            "nombre_impresora": "" if imp_sel == "Sin impresora" else imp_sel,
+            "modo": modo_clave,
+            "ancho_papel": ancho,
+            "nit": self.entry_imp_nit.get().strip(),
+            "direccion": self.entry_imp_dir.get().strip(),
+            "telefono": self.entry_imp_tel.get().strip(),
+            "mensaje_pie": self.entry_imp_pie.get().strip()
+        }
+
+    def guardar_ajustes_impresora(self):
+        datos = self._recoger_datos_impresora_ui()
+        exito, msg = guardar_config_impresora(datos)
+        self.lbl_mensaje_impresora.configure(text=msg, text_color=COLOR_EXITO if exito else COLOR_FALLO)
+
+    def probar_cajon_ui(self):
+        datos = self._recoger_datos_impresora_ui()
+        exito, msg = abrir_cajon_monedero(forzar_manual=True, nombre_impresora_override=datos["nombre_impresora"])
+        self.lbl_mensaje_impresora.configure(
+            text="Pulso enviado al cajón monedero." if exito else msg,
+            text_color=COLOR_EXITO if exito else COLOR_FALLO
+        )
+
+    def probar_impresion_ui(self):
+        datos = self._recoger_datos_impresora_ui()
+        exito, msg = imprimir_ticket_prueba(config_override=datos)
+        self.lbl_mensaje_impresora.configure(
+            text="Ticket de prueba enviado a la impresora." if exito else msg,
+            text_color=COLOR_EXITO if exito else COLOR_FALLO
+        )

@@ -164,7 +164,10 @@ def registrar_gasto(caja_id, descripcion, monto, tipo_gasto="Dinero", producto_i
                 caja.gastos_totales += monto
 
         sesion.commit()
-        if tipo_gasto == "Inventario" and producto_id:
+        if tipo_gasto == "Dinero":
+            from bll.gestor_impresora import abrir_cajon_monedero
+            abrir_cajon_monedero()
+        elif tipo_gasto == "Inventario" and producto_id:
             evaluar_notificaciones_producto(producto_id)
 
         msg = "Gasto registrado correctamente." if tipo_gasto == "Dinero" else "Baja de inventario registrada."

@@ -22,6 +22,7 @@ from ui.modales.modal_login import ModalLogin
 
 from bll.gestor_caja import obtener_caja_abierta, verificar_cierre_inesperado
 from bll.gestor_notificaciones import sincronizar_notificaciones_sistema, contar_notificaciones_activas
+from bll.gestor_impresora import abrir_cajon_monedero
 
 class VentanaPrincipal(ctk.CTk):
     def __init__(self, nombre_tienda= "TIENDA"):
@@ -71,6 +72,7 @@ class VentanaPrincipal(ctk.CTk):
 
         self.frame_menu.grid_rowconfigure(9, weight=1)
         self.frame_menu.grid_rowconfigure(10, weight=1)
+        self.frame_menu.grid_rowconfigure(11, weight=1)
 
         try:
             pngs = [f for f in os.listdir(CARPETA_IMAGENES) if f.lower().endswith('.png')]
@@ -124,7 +126,16 @@ class VentanaPrincipal(ctk.CTk):
             
             self.btn_proveedores = nuevo_boton(self.frame_menu, "Proveedores", comando=self.mostrar_proveedores)
             self.btn_proveedores.grid(row=8, column=0, padx=20, pady=8)
-    
+
+        self.btn_abrir_cajon = nuevo_boton(
+            self.frame_menu,
+            "Abrir Cajón",
+            comando=self.accion_abrir_cajon,
+            color_fondo="#078d3a",
+            color_hover="#054d20"
+        )
+        self.btn_abrir_cajon.grid(row=9, column=0, padx=20, pady=8)
+
         self.btn_notificaciones = nuevo_boton(
             self.frame_menu,
             "Notificaciones (0)",
@@ -132,15 +143,16 @@ class VentanaPrincipal(ctk.CTk):
             color_fondo="#cc1111",
             color_hover="#9e0d0d"
         )
-        self.btn_notificaciones.grid(row=9, column=0, padx=20, pady=10)
+        self.btn_notificaciones.grid(row=10, column=0, padx=20, pady=10)
 
         self.btn_config = nuevo_boton(
             self.frame_menu, "Configuración", 
             comando=self.mostrar_configuracion,
             color_fondo="#797777", color_hover="#646363"
         )
-        self.btn_config.grid(row=10, column=0, padx=20, pady=15)
+        self.btn_config.grid(row=11, column=0, padx=20, pady=15)
         self.actualizar_contador_notificaciones()
+        self.actualizar_estado_boton_cajon()
 
     def cambiar_vista(self, nueva_vista_clase):
 
@@ -163,6 +175,22 @@ class VentanaPrincipal(ctk.CTk):
     def mostrar_inventario(self): self.cambiar_vista(VistaInventario)
     def mostrar_historial(self): self.cambiar_vista(VistaHistorial)
     def mostrar_proveedores(self): self.cambiar_vista(VistaProveedores)
+    
+    def actualizar_estado_boton_cajon(self):
+        """Habilita 'Abrir Cajón' si hay una caja abierta o si el usuario es Administrador."""
+        if not hasattr(self, "btn_abrir_cajon") or not self.btn_abrir_cajon.winfo_exists():
+            return
+        es_admin = (self.usuario_actual or {}).get("rol") == "Administrador"
+        hay_caja = obtener_caja_abierta() is not None
+        if es_admin or hay_caja:
+            self.btn_abrir_cajon.configure(state="normal", fg_color="#0bac49", hover_color="#054d20")
+        else:
+            self.btn_abrir_cajon.configure(state="disabled", fg_color="#3a3a3a")
+
+    def accion_abrir_cajon(self):
+        exito, msg = abrir_cajon_monedero(forzar_manual=True)
+        if not exito:
+            messagebox.showwarning("Cajón Monedero", msg)
 
     def mostrar_notificaciones(self):
         self._alerta_no_vista = False

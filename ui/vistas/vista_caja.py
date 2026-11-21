@@ -2,6 +2,7 @@
 from bll.gestor_ventas import registrar_venta, obtener_ventas_pendientes, eliminar_venta_pendiente
 from bll.gestor_productos import buscar_producto_por_codigo, buscar_productos_por_nombre
 from bll.gestor_caja import *
+from bll.gestor_impresora import abrir_cajon_monedero
 # Componentes
 from ui.componentes.configuracion_componentes import *
 from ui.componentes.creador_componentes import *
@@ -126,10 +127,13 @@ class VistaCaja(ConfiguracionComponentes):
             exito, mensaje = abrir_caja(base_efectivo, usuario_id=usuario_id)
             
             if exito:
+                abrir_cajon_monedero()
                 self.verificar_estado_caja()
                 ventana_ppal = self.winfo_toplevel()
                 if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
                     ventana_ppal.actualizar_contador_notificaciones()
+                if hasattr(ventana_ppal, "actualizar_estado_boton_cajon"):
+                    ventana_ppal.actualizar_estado_boton_cajon()
             else:
                 self.lbl_mensaje.configure(text=mensaje, text_color=COLOR_FALLO)
 
@@ -392,6 +396,7 @@ class VistaCaja(ConfiguracionComponentes):
                 self.entry_buscar_prod.focus()
             ])
             return
+        abrir_cajon_monedero()
         ModalCierreCaja(self, self.caja_activa_id, self.ejecutar_cierre)
     
     def ejecutar_cierre(self, efectivo_fisico, diferencia):
@@ -403,6 +408,8 @@ class VistaCaja(ConfiguracionComponentes):
             ventana_ppal = self.winfo_toplevel()
             if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
                 ventana_ppal.actualizar_contador_notificaciones()
+            if hasattr(ventana_ppal, "actualizar_estado_boton_cajon"):
+                ventana_ppal.actualizar_estado_boton_cajon()
         else:
             print(f"Error al cerrar: {mensaje}")
 
@@ -439,11 +446,21 @@ class VistaCaja(ConfiguracionComponentes):
         total_venta = sum(item['subtotal'] for item in items_carrito)
         origen = getattr(self, 'venta_guardada_origen', None)
 
+        ventana_ppal = self.winfo_toplevel()
+        cajero_nombre = (getattr(ventana_ppal, 'usuario_actual', {}) or {}).get('nombre', '')
+        cliente_venta = getattr(self, 'cliente_actual', None)
+
         exito, mensaje = registrar_venta(
             carrito=items_carrito, 
             metodo_pago=metodo_pago, 
             caja_id=self.caja_activa_id,
-            venta_guardada_origen=origen
+            venta_guardada_origen=origen,
+            datos_ticket={
+                "cajero": cajero_nombre,
+                "entregado": entregado,
+                "vueltas": vueltas,
+                "cliente": cliente_venta
+            }
         )
 
         if exito:
