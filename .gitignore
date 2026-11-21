@@ -48,6 +48,7 @@ Thumbs.db
 # ==========================================
 datos/
 drivers/
+Output/
 
 # ==========================================
 # Archivos de configuración de la aplicación
