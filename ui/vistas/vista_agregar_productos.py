@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from bll.gestor_productos import agregar_producto, buscar_productos_por_nombre
+from bll.gestor_productos import agregar_producto, buscar_productos_por_nombre, obtener_productos_unitarios
 from ui.vistas.secciones.panel_autocompletado import PanelAutocompletado
 from ui.componentes.configuracion_componentes import ConfiguracionComponentes
 from ui.componentes.creador_componentes import *
@@ -14,7 +14,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
 
         self.frame_central = nuevo_frame(self, color_fondo="transparent")
         self.frame_central.grid(row=1, column=0)
-        
+
         # --- TÍTULO ---
         self.lbl_titulo = nuevo_label(self.frame_central, "Agregar Producto", fuente=FUENTE_TITULOS)
         self.lbl_titulo.pack(pady=10)
@@ -35,32 +35,46 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         self.entry_costo.bind("<Return>", lambda event: self.entry_precio.focus())
         self.entry_costo.bind("<Escape>", lambda event: self.cancelar_registro())
         self.entry_costo.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_costo))
-        
+
         self.entry_precio = nueva_caja_texto(self.frame_central, placeholder="Precio de Venta")
         self.entry_precio.pack(pady=8)
         self.entry_precio.bind("<Return>", self.avanzar_desde_precio)
         self.entry_precio.bind("<Escape>", lambda event: self.cancelar_registro())
         self.entry_precio.bind("<KeyRelease>", lambda event: self.formatear_entrada_moneda(self.entry_precio))
 
-        # --- INTERRUPTOR DE RELACIÓN (ENCIMA DE STOCK) ---
+        # --- FILA DE INTERRUPTORES LADO A LADO (MUTUAMENTE EXCLUYENTES) ---
+        self.frame_switches = nuevo_frame(self.frame_central, color_fondo="transparent")
+        self.frame_switches.pack(pady=(12, 5))
+
         self.var_paquete = ctk.BooleanVar(value=False)
         self.switch_paquete = ctk.CTkSwitch(
-            self.frame_central, 
-            text="¿Es un paquete de otro producto?",
+            self.frame_switches,
+            text="¿Es un paquete?",
             command=self.alternar_paquete,
             variable=self.var_paquete,
             font=("Arial", 12, "bold"),
             progress_color=COLOR_EXITO
         )
-        self.switch_paquete.pack(pady=(12, 5))
+        self.switch_paquete.pack(side="left", padx=12)
 
-        # --- PANEL RELACIONAL (OCULTO POR DEFECTO) ---
+        self.var_compartir = ctk.BooleanVar(value=False)
+        self.switch_compartir = ctk.CTkSwitch(
+            self.frame_switches,
+            text="¿Compartir stock?",
+            command=self.alternar_compartir,
+            variable=self.var_compartir,
+            font=("Arial", 12, "bold"),
+            progress_color="#4fa6ff"
+        )
+        self.switch_compartir.pack(side="left", padx=12)
+
+        # --- PANEL RELACIONAL PAQUETE ---
         self.frame_relacional = nuevo_frame(self.frame_central, color_fondo="#2b2b2b")
 
         nuevo_label(
-            self.frame_relacional, 
-            "Busque y seleccione el producto base:", 
-            fuente=("Arial", 13, "bold"), 
+            self.frame_relacional,
+            "Busque y seleccione el producto base:",
+            fuente=("Arial", 13, "bold"),
             color_texto="#ffffff"
         ).pack(pady=(12, 5), padx=20)
 
@@ -70,9 +84,9 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         self.entry_base_buscar.bind("<Escape>", lambda event: self.cancelar_registro())
 
         self.lbl_cant_paquete = nuevo_label(
-            self.frame_relacional, 
-            "Unidades por paquete:", 
-            fuente=("Arial", 13, "bold"), 
+            self.frame_relacional,
+            "Unidades por paquete:",
+            fuente=("Arial", 13, "bold"),
             color_texto="#d4ac0d"
         )
         self.lbl_cant_paquete.pack(pady=(15, 2), padx=20)
@@ -88,6 +102,27 @@ class VistaAgregarProducto(ConfiguracionComponentes):
             self.lbl_cant_paquete,
             self.resultado_autocompletado_base
         )
+
+        # --- PANEL COMPARTIR STOCK ---
+        self.frame_compartir = nuevo_frame(self.frame_central, color_fondo="#2b2b2b")
+
+        nuevo_label(
+            self.frame_compartir,
+            "Compartir stock con (se sumarán las unidades):",
+            fuente=("Arial", 12, "bold"),
+            color_texto="#4fa6ff"
+        ).pack(pady=(10, 4), padx=15)
+
+        self.entry_buscar_compartir = nueva_caja_texto(self.frame_compartir, placeholder="Buscar sabor o producto...")
+        self.entry_buscar_compartir.pack(pady=(0, 6), padx=15, fill="x")
+        self.entry_buscar_compartir.bind("<KeyRelease>", lambda e: self.filtrar_lista_compartir())
+        self.entry_buscar_compartir.bind("<Escape>", lambda e: self.cancelar_registro())
+
+        self.scroll_compartir = ctk.CTkScrollableFrame(self.frame_compartir, fg_color="#202020", height=120, width=360)
+        self.scroll_compartir.pack(pady=(0, 10), padx=15, fill="x")
+
+        self.candidatos_compartir = []
+        self.vars_compartir = {}
 
         # --- STOCK INICIAL ---
         self.entry_stock = nueva_caja_texto(self.frame_central, placeholder="Stock Inicial")
@@ -105,41 +140,39 @@ class VistaAgregarProducto(ConfiguracionComponentes):
 
         self.btn_cancelar = nuevo_boton(self.frame_botones, "Cancelar", self.cancelar_registro, color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER)
         self.btn_cancelar.grid(row=0, column=1, padx=10)
-        
+
         # --- MENSAJE DE ESTADO ---
         self.lbl_mensaje = nuevo_label(self.frame_central, "")
         self.lbl_mensaje.pack(pady=5)
 
         # --- MINI TABLA VISUAL DEL ÚLTIMO PRODUCTO AGREGADO ---
         self.frame_resumen = nuevo_frame(self.frame_central, color_fondo="#202020", radio_esquinas=8)
-        
-        # --- LISTA DE ENTRADAS EDITABLES PARA LIMPIEZA Y BLOQUEO ---
+
         self.entradas_editables = [
-            self.entry_nombre, self.entry_codigo, self.entry_costo, 
-            self.entry_precio, self.entry_base_buscar, self.entry_cant_paquete, self.entry_stock
+            self.entry_nombre, self.entry_codigo, self.entry_costo,
+            self.entry_precio, self.entry_base_buscar, self.entry_cant_paquete,
+            self.entry_buscar_compartir, self.entry_stock
         ]
 
     def avanzar_desde_precio(self, event=None):
-        """Dirige el foco al buscador de producto base si es paquete, o directo al stock."""
         if self.var_paquete.get():
             self.entry_base_buscar.focus()
+        elif self.var_compartir.get():
+            self.entry_buscar_compartir.focus()
         else:
             self.entry_stock.focus()
 
     def confirmar_producto_base(self, event=None):
-        """Selecciona la sugerencia resaltada con Enter o avanza a unidades por paquete."""
         if self.autocompletado_relacional.procesar_enter():
             return
         self.entry_cant_paquete.focus()
 
     def resultado_autocompletado_base(self, producto):
-        """Rellena el nombre sin bloquear el campo y pasa el foco a unidades por paquete."""
         self.entry_base_buscar.delete(0, 'end')
         self.entry_base_buscar.insert(0, producto['nombre'])
         self.entry_cant_paquete.focus()
 
     def mostrar_mini_tabla(self, nombre, costo, precio, stock, info_paquete=None):
-        """Renderiza la mini tabla inferior con los datos del último producto guardado."""
         for w in self.frame_resumen.winfo_children():
             w.destroy()
 
@@ -149,7 +182,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
 
         tabla = nuevo_frame(self.frame_resumen, color_fondo="#2b2b2b")
         tabla.pack(fill="x", padx=12, pady=(0, 10))
-        
+
         cols = [3, 2, 2, 1, 3] if info_paquete else [3, 2, 2, 1]
         for i, w in enumerate(cols):
             tabla.grid_columnconfigure(i, weight=w, uniform="mini_res")
@@ -163,19 +196,23 @@ class VistaAgregarProducto(ConfiguracionComponentes):
         ]
 
         if info_paquete:
-            headers.append(("Paquete de", "center"))
+            headers.append(("Relación", "center"))
             valores.append((info_paquete, "center", "#d4ac0d", "italic"))
 
         for idx, (h, pos) in enumerate(headers):
-            nuevo_label(tabla, h, fuente=("Arial", 11, "bold"), color_texto="#a0a0a0", poscicion=pos).grid(row=0, column=idx, sticky="nsew" if pos=="center" else pos, padx=8, pady=(6, 2))
+            nuevo_label(tabla, h, fuente=("Arial", 11, "bold"), color_texto="#a0a0a0", poscicion=pos).grid(row=0, column=idx, sticky="nsew" if pos == "center" else pos, padx=8, pady=(6, 2))
 
         for idx, (val, pos, col, peso) in enumerate(valores):
-            nuevo_label(tabla, val, fuente=("Arial", 12, peso), color_texto=col, poscicion=pos).grid(row=1, column=idx, sticky="nsew" if pos=="center" else pos, padx=8, pady=(2, 8))
+            nuevo_label(tabla, val, fuente=("Arial", 12, peso), color_texto=col, poscicion=pos).grid(row=1, column=idx, sticky="nsew" if pos == "center" else pos, padx=8, pady=(2, 8))
 
-    # --- LÓGICA DEL PANEL RELACIONAL ---
+    # --- LÓGICA DE SWITCHES MUTUAMENTE EXCLUYENTES ---
     def alternar_paquete(self):
         self.autocompletado_relacional.ocultar()
         if self.var_paquete.get():
+            if self.var_compartir.get():
+                self.var_compartir.set(False)
+                self.frame_compartir.pack_forget()
+
             self.frame_relacional.pack(fill="x", pady=5, padx=20, before=self.entry_stock)
             self.entry_base_buscar.delete(0, 'end')
             self.entry_cant_paquete.delete(0, 'end')
@@ -187,14 +224,63 @@ class VistaAgregarProducto(ConfiguracionComponentes):
             self.entry_stock.delete(0, 'end')
             self.entry_stock.configure(placeholder_text="Stock Inicial")
 
+    def alternar_compartir(self):
+        self.autocompletado_relacional.ocultar()
+        if self.var_compartir.get():
+            if self.var_paquete.get():
+                self.var_paquete.set(False)
+                self.frame_relacional.pack_forget()
+
+            self.candidatos_compartir = obtener_productos_unitarios()
+            self.vars_compartir = {p["id"]: ctk.BooleanVar(value=False) for p in self.candidatos_compartir}
+            self.entry_buscar_compartir.delete(0, 'end')
+            self.filtrar_lista_compartir()
+
+            self.frame_compartir.pack(fill="x", pady=5, padx=20, before=self.entry_stock)
+            self.entry_stock.delete(0, 'end')
+            self.entry_stock.configure(placeholder_text="Unidades nuevas a sumar (Opcional)")
+            self.entry_buscar_compartir.focus()
+        else:
+            self.frame_compartir.pack_forget()
+            self.entry_stock.delete(0, 'end')
+            self.entry_stock.configure(placeholder_text="Stock Inicial")
+
+    def filtrar_lista_compartir(self):
+        for w in self.scroll_compartir.winfo_children():
+            w.destroy()
+
+        criterio = self.entry_buscar_compartir.get().strip().lower()
+        filtrados = [
+            p for p in self.candidatos_compartir
+            if not criterio or criterio in p["nombre"].lower()
+        ]
+
+        if not filtrados:
+            nuevo_label(self.scroll_compartir, "No hay productos unitarios disponibles.", color_texto="#a0a0a0").pack(pady=15)
+            return
+
+        for p in filtrados:
+            etiqueta = f"{p['nombre']}  (Stock: {p['stock']})"
+            if p.get("grupo_stock_id"):
+                etiqueta += "  🔗"
+            cb = ctk.CTkCheckBox(
+                self.scroll_compartir,
+                text=etiqueta,
+                variable=self.vars_compartir[p["id"]],
+                font=("Arial", 12),
+                text_color="#ffffff"
+            )
+            cb.pack(anchor="w", padx=8, pady=3)
+
     # --- AÑADIR PRODUCTO A LA DB ---
-    def guardar_producto(self, event=None): 
+    def guardar_producto(self, event=None):
         nombre = self.entry_nombre.get().strip()
         codigo = self.entry_codigo.get().strip()
         costo_str = self.entry_costo.get().replace(".", "").strip()
         precio_str = self.entry_precio.get().replace(".", "").strip()
-        
+
         es_paquete = self.var_paquete.get()
+        es_compartir = self.var_compartir.get()
         stock_str = self.entry_stock.get().replace(".", "").strip()
 
         if not nombre or not costo_str or not precio_str:
@@ -210,7 +296,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
             if costo < 0 or precio < 0 or stock < 0:
                 self.lbl_mensaje.configure(text="Los valores numéricos no pueden ser negativos.", text_color="red")
                 return
-            
+
             if precio == 0:
                 self.lbl_mensaje.configure(text="El precio de venta no puede ser $0.", text_color="red")
                 return
@@ -221,7 +307,8 @@ class VistaAgregarProducto(ConfiguracionComponentes):
 
             producto_base_id = None
             cantidad_por_paquete = 1
-            info_paquete_tabla = None
+            info_relacion_tabla = None
+            ids_compartir_stock = []
 
             if es_paquete:
                 texto_base = self.entry_base_buscar.get().strip()
@@ -242,7 +329,7 @@ class VistaAgregarProducto(ConfiguracionComponentes):
                     return
 
                 producto_base_id = producto_base['id']
-                
+
                 try:
                     cantidad_por_paquete = int(self.entry_cant_paquete.get().replace(".", "").strip())
                     if cantidad_por_paquete <= 1:
@@ -254,17 +341,25 @@ class VistaAgregarProducto(ConfiguracionComponentes):
                     self.entry_cant_paquete.focus()
                     return
 
-                info_paquete_tabla = f"{producto_base['nombre']} (x{cantidad_por_paquete})"
+                info_relacion_tabla = f"{producto_base['nombre']} (x{cantidad_por_paquete})"
+
+            elif es_compartir:
+                ids_compartir_stock = [pid for pid, var in self.vars_compartir.items() if var.get()]
+                if not ids_compartir_stock:
+                    self.lbl_mensaje.configure(text="Seleccione al menos un producto para compartir stock.", text_color="red")
+                    return
+                info_relacion_tabla = f"Stock compartido ({len(ids_compartir_stock) + 1})"
 
             exito, mensaje = agregar_producto(
-                nombre=nombre, 
-                costo=costo, 
-                precio_venta=precio, 
-                codigo_barras=codigo, 
+                nombre=nombre,
+                costo=costo,
+                precio_venta=precio,
+                codigo_barras=codigo,
                 stock=stock,
                 es_paquete=es_paquete,
                 producto_base_id=producto_base_id,
-                cantidad_por_paquete=cantidad_por_paquete
+                cantidad_por_paquete=cantidad_por_paquete,
+                ids_compartir_stock=ids_compartir_stock
             )
 
             if exito:
@@ -272,29 +367,33 @@ class VistaAgregarProducto(ConfiguracionComponentes):
                 self.lbl_mensaje.configure(text=mensaje, text_color="green")
                 if costo == 0:
                     self.lbl_mensaje.configure(text="Advertencia: Producto guardado con costo $0.", text_color="#d4ac0d")
-                
-                self.mostrar_mini_tabla(nombre, costo, precio, stock, info_paquete_tabla)
+
+                self.mostrar_mini_tabla(nombre, costo, precio, stock, info_relacion_tabla)
 
                 self.limpiar_campos()
                 self.var_paquete.set(False)
-                self.alternar_paquete()
+                self.var_compartir.set(False)
+                self.frame_relacional.pack_forget()
+                self.frame_compartir.pack_forget()
+                self.entry_stock.configure(placeholder_text="Stock Inicial")
                 self.entry_nombre.focus()
-            
+            else:
+                self.lbl_mensaje.configure(text=mensaje, text_color="red")
+
             ventana_ppal = self.winfo_toplevel()
             if hasattr(ventana_ppal, "actualizar_contador_notificaciones"):
                 ventana_ppal.actualizar_contador_notificaciones()
 
-            else:
-                self.lbl_mensaje.configure(text=mensaje, text_color="red")
-
         except ValueError:
             self.lbl_mensaje.configure(text="Costo, precio y stock deben ser números.", text_color="red")
-    
-    # --- CANCELAR REGISTRO ---      
+
     def cancelar_registro(self):
         self.autocompletado_relacional.ocultar()
         self.limpiar_campos()
         self.var_paquete.set(False)
-        self.alternar_paquete()
+        self.var_compartir.set(False)
+        self.frame_relacional.pack_forget()
+        self.frame_compartir.pack_forget()
+        self.entry_stock.configure(placeholder_text="Stock Inicial")
         self.lbl_mensaje.configure(text="Registro cancelado.", text_color=COLOR_FALLO)
         self.after(1, self.entry_nombre.focus)

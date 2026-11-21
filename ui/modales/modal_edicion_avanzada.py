@@ -3,7 +3,6 @@ from ui.componentes.creador_componentes import nuevo_frame, nuevo_label, nuevo_b
 from ui.vistas.secciones.panel_autocompletado import PanelAutocompletado
 from bll.gestor_productos import *
 
-# --- SUB-MODAL DE CONFIRMACIÓN DE ELIMINACIÓN ---
 class ModalConfirmacionEliminar(ctk.CTkToplevel):
     def __init__(self, master, callback_confirmar):
         super().__init__(master)
@@ -12,45 +11,48 @@ class ModalConfirmacionEliminar(ctk.CTkToplevel):
         self.resizable(False, False)
         self.transient(master)
         self.grab_set()
-        
+
         self.callback = callback_confirmar
-        
+
         lbl = nuevo_label(self, "¿Estás absolutamente seguro de eliminar esto?\nEsta acción borrará el producto para siempre.", color_texto=COLOR_FALLO, fuente=("Arial", 13, "bold"))
         lbl.pack(pady=20)
-        
+
         f_btns = nuevo_frame(self, color_fondo="transparent")
         f_btns.pack(fill="x", pady=10)
-        
+
         btn_no = nuevo_boton(f_btns, "Cancelar", comando=self.destroy, color_fondo="#555555")
         btn_no.pack(side="left", expand=True, padx=15)
-        
+
         btn_si = nuevo_boton(f_btns, "Sí, Eliminar", comando=self.confirmar, color_fondo=COLOR_FALLO, color_hover=COLOR_FALLO_HOVER)
         btn_si.pack(side="right", expand=True, padx=15)
-        
+
     def confirmar(self):
         self.callback()
         self.destroy()
 
-# --- MODAL PRINCIPAL ---
+
 class ModalEdicionAvanzada(ctk.CTkToplevel):
     def __init__(self, master, producto_id, callback_actualizar):
         super().__init__(master)
-        
+
         self.title("Edición Avanzada")
-        self.geometry("500x650")
+        self.geometry("560x690")
         self.resizable(False, False)
         self.transient(master)
         self.grab_set()
-        
+
         self.producto_id = producto_id
         self.callback = callback_actualizar
 
         self.producto_datos = obtener_producto_por_id(producto_id)
-        
-        self.productos_unitarios = obtener_productos_unitarios()
-        self.productos_unitarios = [p for p in self.productos_unitarios if p['id'] != self.producto_id]
-        
+
+        self.productos_unitarios = [
+            p for p in obtener_productos_unitarios()
+            if p['id'] != self.producto_id
+        ]
+
         self.id_producto_base_seleccionado = None
+        self.vars_compartir = {}
 
         self.crear_interfaz()
         self.cargar_datos_actuales()
@@ -59,41 +61,56 @@ class ModalEdicionAvanzada(ctk.CTkToplevel):
     def crear_interfaz(self):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        
+
         frame_principal = nuevo_frame(self, color_fondo="transparent")
         frame_principal.grid(row=0, column=0, sticky="nsew", padx=20, pady=10)
-        
-        nuevo_label(frame_principal, "Edición Avanzada", fuente=("Arial", 20, "bold"), color_texto="#ffffff").pack(pady=(0, 10))
-        
+
+        nuevo_label(frame_principal, "Edición Avanzada", fuente=("Arial", 20, "bold"), color_texto="#ffffff").pack(pady=(0, 8))
+
         # --- DATOS BÁSICOS ---
         frame_basico = nuevo_frame(frame_principal, color_fondo="#2b2b2b")
-        frame_basico.pack(fill="x", pady=5, ipadx=10, ipady=10)
-        
-        nuevo_label(frame_basico, "Nombre del Producto:", poscicion="w").pack(fill="x", padx=10, pady=(5,0))
+        frame_basico.pack(fill="x", pady=5, ipadx=10, ipady=8)
+
+        nuevo_label(frame_basico, "Nombre del Producto:", poscicion="w").pack(fill="x", padx=10, pady=(4, 0))
         self.entry_nombre = nueva_caja_texto(frame_basico)
-        self.entry_nombre.pack(fill="x", padx=10, pady=(0, 10))
-        
-        nuevo_label(frame_basico, "Código de Barras (Opcional):", poscicion="w").pack(fill="x", padx=10, pady=(5,0))
+        self.entry_nombre.pack(fill="x", padx=10, pady=(0, 8))
+
+        nuevo_label(frame_basico, "Código de Barras (Opcional):", poscicion="w").pack(fill="x", padx=10, pady=(4, 0))
         self.entry_codigo = nueva_caja_texto(frame_basico)
-        self.entry_codigo.pack(fill="x", padx=10, pady=(0, 5))
+        self.entry_codigo.pack(fill="x", padx=10, pady=(0, 4))
 
         # --- DATOS RELACIONALES ---
         frame_relacional = nuevo_frame(frame_principal, color_fondo="#2b2b2b")
-        frame_relacional.pack(fill="x", pady=10, ipadx=10, ipady=10)
-        
+        frame_relacional.pack(fill="both", expand=True, pady=8, ipadx=10, ipady=8)
+
+        frame_switches = nuevo_frame(frame_relacional, color_fondo="transparent")
+        frame_switches.pack(pady=8)
+
         self.var_paquete = ctk.BooleanVar(value=False)
         self.switch_paquete = ctk.CTkSwitch(
-            frame_relacional, 
-            text="¿Es un paquete de otro producto?", 
-            variable=self.var_paquete, 
-            command=self.alternar_paquete, 
-            font=("Arial", 12, "bold"), 
+            frame_switches,
+            text="¿Es un paquete?",
+            variable=self.var_paquete,
+            command=self.alternar_paquete,
+            font=("Arial", 12, "bold"),
             progress_color=COLOR_EXITO
         )
-        self.switch_paquete.pack(pady=10)
+        self.switch_paquete.pack(side="left", padx=12)
 
+        self.var_compartir = ctk.BooleanVar(value=False)
+        self.switch_compartir = ctk.CTkSwitch(
+            frame_switches,
+            text="¿Compartir stock?",
+            variable=self.var_compartir,
+            command=self.alternar_compartir,
+            font=("Arial", 12, "bold"),
+            progress_color="#4fa6ff"
+        )
+        self.switch_compartir.pack(side="left", padx=12)
+
+        # --- SUBPANEL PAQUETE ---
         self.frame_opciones_paquete = nuevo_frame(frame_relacional, color_fondo="transparent")
-        
+
         self.lbl_titulo_base = nuevo_label(self.frame_opciones_paquete, "Busque y seleccione el producto base:", poscicion="w")
         self.lbl_titulo_base.pack(fill="x", padx=10, pady=(0, 5))
 
@@ -105,25 +122,43 @@ class ModalEdicionAvanzada(ctk.CTkToplevel):
 
         self.lbl_titulo_cant = nuevo_label(self.frame_opciones_paquete, "Unidades por paquete:", poscicion="w")
         self.lbl_titulo_cant.pack(fill="x", padx=10, pady=(15, 5))
-        
+
         self.entry_cant_paquete = nueva_caja_texto(self.frame_opciones_paquete, placeholder="Ej: 30")
         self.entry_cant_paquete.pack(fill="x", padx=10, pady=(0, 5))
 
         self.autocompletado_relacional = PanelAutocompletado(
-            self.entry_base_buscar, 
-            self.frame_opciones_paquete, 
+            self.entry_base_buscar,
+            self.frame_opciones_paquete,
             self.lbl_titulo_cant,
             self.resultado_autocompletado_base
         )
 
+        # --- SUBPANEL COMPARTIR STOCK ---
+        self.frame_opciones_compartir = nuevo_frame(frame_relacional, color_fondo="transparent")
+
+        nuevo_label(
+            self.frame_opciones_compartir,
+            "Productos que comparten stock (al unir nuevos se sumarán sus unidades):",
+            fuente=("Arial", 11, "bold"),
+            color_texto="#4fa6ff",
+            poscicion="w"
+        ).pack(fill="x", padx=10, pady=(0, 4))
+
+        self.entry_buscar_compartir = nueva_caja_texto(self.frame_opciones_compartir, placeholder="Filtrar producto...")
+        self.entry_buscar_compartir.pack(fill="x", padx=10, pady=(0, 6))
+        self.entry_buscar_compartir.bind("<KeyRelease>", lambda e: self.filtrar_lista_compartir())
+
+        self.scroll_compartir = ctk.CTkScrollableFrame(self.frame_opciones_compartir, fg_color="#202020", height=145)
+        self.scroll_compartir.pack(fill="both", expand=True, padx=10, pady=(0, 4))
+
         # --- MENSAJE ---
         self.lbl_mensaje = nuevo_label(frame_principal, "", color_texto=COLOR_EXITO)
-        self.lbl_mensaje.pack(pady=5)
+        self.lbl_mensaje.pack(pady=4)
 
         # --- BOTONES ---
         frame_botones = nuevo_frame(frame_principal, color_fondo="transparent")
-        frame_botones.pack(fill="x", pady=10)
-        
+        frame_botones.pack(fill="x", pady=8)
+
         self.btn_cancelar = nuevo_boton(frame_botones, "Cancelar", comando=self.destroy, color_fondo="#555555", color_hover="#333333")
         self.btn_cancelar.pack(side="left", expand=True, padx=5)
 
@@ -135,27 +170,27 @@ class ModalEdicionAvanzada(ctk.CTkToplevel):
 
     # --- LÓGICA AUTOCOMPLETADO ---
     def ejecutar_busqueda_base(self, event=None):
-        """Dispara el Enter dentro del autocompletado relacional."""
         self.autocompletado_relacional.procesar_enter()
 
     def resetear_buscador_base(self, event=None):
-        """Permite borrar la selección y buscar otro producto (Tecla ESC)."""
         self.id_producto_base_seleccionado = None
         self.entry_base_buscar.configure(state="normal", fg_color="#343638", text_color="#ffffff")
         self.entry_base_buscar.delete(0, 'end')
         self.entry_base_buscar.focus()
 
     def resultado_autocompletado_base(self, producto):
-        """Callback: Se activa cuando seleccionan un producto base del menú flotante."""
         self.id_producto_base_seleccionado = producto['id']
         self.entry_base_buscar.delete(0, 'end')
         self.entry_base_buscar.insert(0, producto['nombre'])
-
         self.entry_cant_paquete.focus()
 
-    # --- LÓGICA DE INTERFAZ Y BD ---
+    # --- LÓGICA DE SWITCHES ---
     def alternar_paquete(self):
         if self.var_paquete.get():
+            if self.var_compartir.get():
+                self.var_compartir.set(False)
+                self.frame_opciones_compartir.pack_forget()
+
             self.frame_opciones_paquete.pack(fill="x", pady=5)
             self.resetear_buscador_base()
 
@@ -167,45 +202,94 @@ class ModalEdicionAvanzada(ctk.CTkToplevel):
         else:
             self.frame_opciones_paquete.pack_forget()
 
+    def alternar_compartir(self):
+        if self.var_compartir.get():
+            if self.var_paquete.get():
+                self.var_paquete.set(False)
+                self.frame_opciones_paquete.pack_forget()
+
+            ids_hermanos = {h["id"] for h in self.producto_datos.get("hermanos_stock", [])} if self.producto_datos else set()
+            self.productos_unitarios.sort(key=lambda p: (0 if p["id"] in ids_hermanos else 1, p["nombre"].lower()))
+
+            self.vars_compartir = {
+                p["id"]: ctk.BooleanVar(value=(p["id"] in ids_hermanos))
+                for p in self.productos_unitarios
+            }
+            self.entry_buscar_compartir.delete(0, 'end')
+            self.filtrar_lista_compartir()
+            self.frame_opciones_compartir.pack(fill="both", expand=True, pady=5)
+        else:
+            self.frame_opciones_compartir.pack_forget()
+
+    def filtrar_lista_compartir(self):
+        for w in self.scroll_compartir.winfo_children():
+            w.destroy()
+
+        criterio = self.entry_buscar_compartir.get().strip().lower()
+        filtrados = [
+            p for p in self.productos_unitarios
+            if not criterio or criterio in p["nombre"].lower()
+        ]
+
+        if not filtrados:
+            nuevo_label(self.scroll_compartir, "No hay productos que coincidan.", color_texto="#a0a0a0").pack(pady=15)
+            return
+
+        for p in filtrados:
+            etiqueta = f"{p['nombre']}  (Stock: {p['stock']})"
+            if p.get("grupo_stock_id") and p["grupo_stock_id"] != (self.producto_datos or {}).get("grupo_stock_id"):
+                etiqueta += "  🔗"
+            cb = ctk.CTkCheckBox(
+                self.scroll_compartir,
+                text=etiqueta,
+                variable=self.vars_compartir[p["id"]],
+                font=("Arial", 12),
+                text_color="#ffffff"
+            )
+            cb.pack(anchor="w", padx=8, pady=3)
+
     def cargar_datos_actuales(self):
-        if not self.producto_datos: return
-        
+        if not self.producto_datos:
+            return
+
         self.entry_nombre.insert(0, self.producto_datos['nombre'])
         if self.producto_datos['codigo_barras']:
             self.entry_codigo.insert(0, self.producto_datos['codigo_barras'])
-            
+
         if self.producto_datos['es_paquete']:
             self.var_paquete.set(True)
             self.entry_cant_paquete.insert(0, str(self.producto_datos['cantidad_por_paquete']))
             self.alternar_paquete()
+        elif self.producto_datos.get('grupo_stock_id') and self.producto_datos.get('hermanos_stock'):
+            self.var_compartir.set(True)
+            self.alternar_compartir()
 
     def validar_permiso_eliminacion(self):
         tiene_ventas = verificar_ventas_producto(self.producto_id)
         es_activo = self.producto_datos.get('activo', True)
-        
+
         if not tiene_ventas:
             self.btn_eliminar_inhabilitar.configure(
-                text="Eliminar Definitivo", 
-                command=self.solicitar_eliminacion, 
+                text="Eliminar Definitivo",
+                command=self.solicitar_eliminacion,
                 fg_color=COLOR_FALLO,
                 hover_color=COLOR_FALLO_HOVER
             )
         else:
             if es_activo:
                 self.btn_eliminar_inhabilitar.configure(
-                    text="Inhabilitar Producto", 
-                    command=self.solicitar_cambio_estado, 
-                    fg_color="#d4ac0d", 
+                    text="Inhabilitar Producto",
+                    command=self.solicitar_cambio_estado,
+                    fg_color="#d4ac0d",
                     hover_color="#b9770e"
                 )
             else:
                 self.btn_eliminar_inhabilitar.configure(
-                    text="Reactivar Producto", 
-                    command=self.solicitar_cambio_estado, 
-                    fg_color=COLOR_EXITO, 
+                    text="Reactivar Producto",
+                    command=self.solicitar_cambio_estado,
+                    fg_color=COLOR_EXITO,
                     hover_color="#1e7e34"
                 )
-
 
     def solicitar_cambio_estado(self):
         es_activacion = not self.producto_datos.get('activo', True)
@@ -214,7 +298,7 @@ class ModalEdicionAvanzada(ctk.CTkToplevel):
             exito, msg = reactivar_producto_db(self.producto_id)
         else:
             exito, msg = desactivar_producto_db(self.producto_id)
-            
+
         if exito:
             self.callback(True, msg, False, None, None, es_cambio_estado=True)
             self.destroy()
@@ -225,32 +309,44 @@ class ModalEdicionAvanzada(ctk.CTkToplevel):
         nombre = self.entry_nombre.get().strip()
         codigo = self.entry_codigo.get().strip()
         es_paquete = self.var_paquete.get()
+        compartir_stock = self.var_compartir.get()
         producto_base_id = None
         cant_paquete = 1
-        
+        ids_compartir = []
+
         if not nombre:
             self.lbl_mensaje.configure(text="El nombre es obligatorio.", text_color=COLOR_FALLO)
             return
-            
+
         if es_paquete:
             nombre_digitado = self.entry_base_buscar.get().strip()
             base_valida = next((p for p in self.productos_unitarios if p['nombre'].lower() == nombre_digitado.lower()), None)
-            
+
             if not base_valida:
                 self.lbl_mensaje.configure(text="Producto base inválido. Seleccione uno de la lista.", text_color=COLOR_FALLO)
                 return
-            
+
             self.id_producto_base_seleccionado = base_valida['id']
             producto_base_id = self.id_producto_base_seleccionado
-                    
+
             try:
                 cant_paquete = int(self.entry_cant_paquete.get().strip())
-                if cant_paquete <= 1: raise ValueError
+                if cant_paquete <= 1:
+                    raise ValueError
             except ValueError:
                 self.lbl_mensaje.configure(text="Cantidad de paquete inválida.", text_color=COLOR_FALLO)
                 return
 
-        exito, msg = actualizar_producto_avanzado(self.producto_id, nombre, codigo, es_paquete, producto_base_id, cant_paquete)
+        elif compartir_stock:
+            ids_compartir = [pid for pid, var in self.vars_compartir.items() if var.get()]
+            if not ids_compartir:
+                self.lbl_mensaje.configure(text="Seleccione al menos un producto para compartir stock.", text_color=COLOR_FALLO)
+                return
+
+        exito, msg = actualizar_producto_avanzado(
+            self.producto_id, nombre, codigo, es_paquete,
+            producto_base_id, cant_paquete, compartir_stock, ids_compartir
+        )
         if exito:
             self.callback(True, msg, False, nombre, codigo)
             self.destroy()
@@ -258,11 +354,9 @@ class ModalEdicionAvanzada(ctk.CTkToplevel):
             self.lbl_mensaje.configure(text=msg, text_color=COLOR_FALLO)
 
     def solicitar_eliminacion(self):
-        """Llama al sub-modal de confirmación antes de eliminar."""
         ModalConfirmacionEliminar(self, self.ejecutar_eliminacion)
-        
+
     def ejecutar_eliminacion(self):
-        """Se ejecuta solo si el usuario dijo 'Sí, Eliminar' en el sub-modal."""
         exito, msg = eliminar_producto_definitivo(self.producto_id)
         if exito:
             self.callback(True, msg, True, None, None)

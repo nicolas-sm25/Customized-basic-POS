@@ -37,6 +37,10 @@ class VentanaPrincipal(ctk.CTk):
         self.usuario_actual = None
 
         self.carrito_guardado = []
+        self._ultimo_total_notificaciones = None
+        self._timer_parpadeo_id = None
+        self._estado_parpadeo = False
+        self._alerta_no_vista = False
 
         # --- INTERCEPCIÓN DEL CIERRE DE WINDOWS ---
         self.protocol("WM_DELETE_WINDOW", self.intentar_cerrar_app)
@@ -161,12 +165,121 @@ class VentanaPrincipal(ctk.CTk):
     def mostrar_proveedores(self): self.cambiar_vista(VistaProveedores)
 
     def mostrar_notificaciones(self):
+        self._alerta_no_vista = False
+        self.detener_parpadeo_notificaciones(quitar_borde=True)
         self.cambiar_vista(VistaNotificaciones)
 
     def actualizar_contador_notificaciones(self):
-        if hasattr(self, "btn_notificaciones"):
-            total = contar_notificaciones_activas()
-            self.btn_notificaciones.configure(text=f"Notificaciones ({total})")
+        if not hasattr(self, "btn_notificaciones") or not self.btn_notificaciones.winfo_exists():
+            return
+
+        total = contar_notificaciones_activas()
+        anterior = self._ultimo_total_notificaciones
+        self._ultimo_total_notificaciones = total
+
+        if total == 0:
+            self._alerta_no_vista = False
+            self.detener_parpadeo_notificaciones(quitar_borde=True)
+            self.btn_notificaciones.configure(
+                text="Notificaciones (0)",
+                fg_color="#444444",
+                hover_color="#5a5a5a",
+                text_color="#ffffff",
+                border_width=0
+            )
+            return
+
+        self.btn_notificaciones.configure(text=f"Notificaciones ({total})")
+
+        if anterior is None or total > anterior:
+            if isinstance(self.vista_actual, VistaNotificaciones):
+                self._alerta_no_vista = False
+            else:
+                self._alerta_no_vista = True
+                self.iniciar_parpadeo_notificaciones(ciclos=32)
+                return
+
+        if self._timer_parpadeo_id is None:
+            self.btn_notificaciones.configure(
+                fg_color="#cc1111",
+                hover_color="#9e0d0d",
+                text_color="#ffffff",
+                border_width=2 if self._alerta_no_vista else 0,
+                border_color="#f39c12"
+            )
+
+    def iniciar_parpadeo_notificaciones(self, ciclos=16):
+        """Alterna el color y borde del botón de notificaciones para llamar la atención del cajero."""
+        self.detener_parpadeo_notificaciones(quitar_borde=False)
+        self._estado_parpadeo = False
+        self._tick_parpadeo_notificaciones(ciclos)
+
+    def _tick_parpadeo_notificaciones(self, ciclos_restantes):
+        if not hasattr(self, "btn_notificaciones") or not self.btn_notificaciones.winfo_exists():
+            self._timer_parpadeo_id = None
+            return
+
+        total = self._ultimo_total_notificaciones or 0
+        if total == 0:
+            self.detener_parpadeo_notificaciones(quitar_borde=True)
+            return
+
+        if ciclos_restantes <= 0:
+            self._timer_parpadeo_id = None
+            self.btn_notificaciones.configure(
+                text=f"Notificaciones ({total})",
+                fg_color="#cc1111",
+                hover_color="#9e0d0d",
+                text_color="#ffffff",
+                border_width=2 if self._alerta_no_vista else 0,
+                border_color="#f39c12"
+            )
+            return
+
+        self._estado_parpadeo = not self._estado_parpadeo
+        if self._estado_parpadeo:
+            self.btn_notificaciones.configure(
+                text=f"Notificaciones ({total})",
+                fg_color="#f39c12",
+                hover_color="#d68910",
+                text_color="#111111",
+                border_width=2,
+                border_color="#ffffff"
+            )
+        else:
+            self.btn_notificaciones.configure(
+                text=f"Notificaciones ({total})",
+                fg_color="#e53935",
+                hover_color="#b71c1c",
+                text_color="#ffffff",
+                border_width=2,
+                border_color="#f39c12"
+            )
+
+        self._timer_parpadeo_id = self.after(
+            420,
+            lambda: self._tick_parpadeo_notificaciones(ciclos_restantes - 1)
+        )
+
+    def detener_parpadeo_notificaciones(self, quitar_borde=True):
+        if self._timer_parpadeo_id is not None:
+            try:
+                self.after_cancel(self._timer_parpadeo_id)
+            except Exception:
+                pass
+            self._timer_parpadeo_id = None
+
+        if hasattr(self, "btn_notificaciones") and self.btn_notificaciones.winfo_exists():
+            total = self._ultimo_total_notificaciones or 0
+            mantener_borde = (not quitar_borde) and self._alerta_no_vista and total > 0
+            self.btn_notificaciones.configure(
+                text=f"Notificaciones ({total})" if total > 0 else "Notificaciones (0)",
+                fg_color="#cc1111" if total > 0 else "#444444",
+                hover_color="#9e0d0d" if total > 0 else "#5a5a5a",
+                text_color="#ffffff",
+                border_width=2 if mantener_borde else 0,
+                border_color="#f39c12"
+            )
 
     def mostrar_configuracion(self):
         if self.vista_actual:

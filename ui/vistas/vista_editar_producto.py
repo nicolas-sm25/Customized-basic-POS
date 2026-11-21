@@ -128,7 +128,7 @@ class VistaEditarProducto(ConfiguracionComponentes):
         self.entry_precio.insert(0, str(int(producto["precio_venta"])))
         self.entry_stock.insert(0, str(producto["stock"]))
 
-        # --- LÓGICA DE PAQUETE RELACIONAL ---
+        # --- LÓGICA DE PAQUETE O STOCK COMPARTIDO ---
         datos_completos = obtener_producto_por_id(producto["id"])
         if datos_completos and datos_completos.get("es_paquete"):
             base_id = datos_completos.get("producto_base_id")
@@ -138,6 +138,10 @@ class VistaEditarProducto(ConfiguracionComponentes):
             nombre_base = next((u["nombre"] for u in unitarios if u["id"] == base_id), "Desconocida/Eliminada")
 
             self.lbl_info_paquete.configure(text=f"Paquete de {nombre_base} | Cant. por paquete: {cant}")
+            self.lbl_info_paquete.grid()
+        elif datos_completos and datos_completos.get("hermanos_stock"):
+            nombres_hermanos = ", ".join(h["nombre"] for h in datos_completos["hermanos_stock"])
+            self.lbl_info_paquete.configure(text=f"Stock compartido con: {nombres_hermanos}")
             self.lbl_info_paquete.grid()
         else:
             self.lbl_info_paquete.grid_remove()

@@ -4,6 +4,7 @@ from dal.modelos.contabilidad_caja import ContabilidadCaja
 from dal.modelos.contabilidad_caja import GastoCaja
 from dal.modelos.ventas import Venta
 from bll.gestor_notificaciones import evaluar_notificaciones_producto, cumplir_notificacion_por_tipo_entidad
+from bll.gestor_productos import ajustar_stock_producto
 
 
 # --- VERIFICAR SI HAY UNA CAJA ABIERTA ---
@@ -155,18 +156,7 @@ def registrar_gasto(caja_id, descripcion, monto, tipo_gasto="Dinero", producto_i
             if not producto:
                 sesion.rollback()
                 return False, "El producto seleccionado no existe."
-            
-            if getattr(producto, 'es_paquete', False) and getattr(producto, 'producto_base_id', None):
-                base = sesion.query(Producto).filter(Producto.id == producto.producto_base_id).first()
-                if base:
-                    base.stock -= (cantidad_descontada * producto.cantidad_por_paquete)
-                    producto.stock = base.stock // producto.cantidad_por_paquete
-            else:
-                producto.stock -= cantidad_descontada
-                derivados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
-                for d in derivados:
-                    if d.cantidad_por_paquete > 0:
-                        d.stock = producto.stock // d.cantidad_por_paquete
+            ajustar_stock_producto(sesion, producto_id, -cantidad_descontada)
 
         caja = sesion.query(ContabilidadCaja).filter(ContabilidadCaja.id == caja_id).first()
         if caja:
@@ -211,18 +201,7 @@ def registrar_mermas_lote(caja_id, descripcion, items_merma):
             if not producto:
                 sesion.rollback()
                 return False, f"El producto '{item['nombre']}' no existe."
-
-            if getattr(producto, 'es_paquete', False) and getattr(producto, 'producto_base_id', None):
-                base = sesion.query(Producto).filter(Producto.id == producto.producto_base_id).first()
-                if base:
-                    base.stock -= (cant * producto.cantidad_por_paquete)
-                    producto.stock = base.stock // producto.cantidad_por_paquete
-            else:
-                producto.stock -= cant
-                derivados = sesion.query(Producto).filter(Producto.producto_base_id == producto.id).all()
-                for d in derivados:
-                    if d.cantidad_por_paquete > 0:
-                        d.stock = producto.stock // d.cantidad_por_paquete
+            ajustar_stock_producto(sesion, prod_id, -cant)
 
         sesion.commit()
         for pid in ids_afectados:

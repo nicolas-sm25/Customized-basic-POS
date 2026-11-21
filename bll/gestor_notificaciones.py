@@ -17,21 +17,36 @@ ETIQUETAS_TIPO = {
 }
 
 
-def registrar_notificacion_entidad(clave_unica, tipo, prioridad, descripcion, entidad_id=None, referencia_extra=None):
-    """Crea o recicla una notificación vinculada a una entidad fija (ej. un producto)."""
+def registrar_notificacion_entidad(clave_unica, tipo, prioridad, descripcion, entidad_id=None, referencia_extra=None, reiniciar_ignoradas=False):
+    """
+    Crea o actualiza una única notificación por clave_unica.
+    Elimina cualquier duplicado histórico con la misma clave_unica.
+    """
     sesion = SessionLocal()
     try:
-        existente = sesion.query(Notificacion).filter(Notificacion.clave_unica == clave_unica).first()
-        if existente:
-            existente.descripcion = descripcion
-            existente.prioridad = prioridad
-            existente.entidad_id = entidad_id
-            existente.referencia_extra = referencia_extra
-            if existente.estado == "Cumplida":
-                existente.estado = "Activa"
-                existente.fecha_creacion = datetime.now()
-                existente.ignorada_por = None
-                existente.fecha_ignorada = None
+        existentes = sesion.query(Notificacion).filter(
+            Notificacion.clave_unica == clave_unica
+        ).order_by(Notificacion.id.desc()).all()
+
+        ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if existentes:
+            principal = existentes[0]
+            for dup in existentes[1:]:
+                sesion.delete(dup)
+
+            principal.tipo = tipo
+            principal.prioridad = prioridad
+            principal.descripcion = descripcion
+            principal.entidad_id = entidad_id
+            principal.referencia_extra = referencia_extra
+
+            if principal.estado == "Cumplida":
+                principal.estado = "Activa"
+                principal.fecha = ahora
+            elif principal.estado == "Ignorada" and reiniciar_ignoradas:
+                principal.estado = "Activa"
+                principal.fecha = ahora
         else:
             nueva = Notificacion(
                 clave_unica=clave_unica,
@@ -41,13 +56,13 @@ def registrar_notificacion_entidad(clave_unica, tipo, prioridad, descripcion, en
                 entidad_id=entidad_id,
                 referencia_extra=referencia_extra,
                 estado="Activa",
-                fecha_creacion=datetime.now()
+                fecha=ahora
             )
             sesion.add(nueva)
+
         sesion.commit()
-    except Exception as e:
+    except Exception:
         sesion.rollback()
-        print(f"Error al registrar notificación de entidad ({clave_unica}): {e}")
     finally:
         sesion.close()
 
@@ -143,8 +158,8 @@ def cumplir_notificacion_por_tipo_entidad(tipo, entidad_id):
         sesion.close()
 
 
-def evaluar_notificaciones_producto(producto_id):
-    """Evalúa stock negativo, stock agotado, costo $0 y paquetes activos con base desactivada."""
+def evaluar_notificaciones_producto(producto_id, reiniciar_ignoradas=False):
+    """Evalúa alertas de stock (individual o grupal), costo $0 y paquetes con base inactiva."""
     sesion = SessionLocal()
     try:
         prod = sesion.query(Producto).filter(Producto.id == producto_id).first()
@@ -152,12 +167,28 @@ def evaluar_notificaciones_producto(producto_id):
             return
 
         ids_a_evaluar = {prod.id}
+        grupos_a_evaluar = set()
+
+        if prod.grupo_stock_id:
+            grupos_a_evaluar.add(prod.grupo_stock_id)
+
         if prod.es_paquete and prod.producto_base_id:
             ids_a_evaluar.add(prod.producto_base_id)
+            base = sesion.query(Producto).filter(Producto.id == prod.producto_base_id).first()
+            if base and base.grupo_stock_id:
+                grupos_a_evaluar.add(base.grupo_stock_id)
         elif not prod.es_paquete:
             vinculados = sesion.query(Producto).filter(Producto.producto_base_id == prod.id).all()
             for v in vinculados:
                 ids_a_evaluar.add(v.id)
+
+        if grupos_a_evaluar:
+            miembros_grupos = sesion.query(Producto).filter(Producto.grupo_stock_id.in_(list(grupos_a_evaluar))).all()
+            for m in miembros_grupos:
+                ids_a_evaluar.add(m.id)
+                paqs = sesion.query(Producto).filter(Producto.producto_base_id == m.id).all()
+                for pq in paqs:
+                    ids_a_evaluar.add(pq.id)
 
         productos = sesion.query(Producto).filter(Producto.id.in_(list(ids_a_evaluar))).all()
 
@@ -166,7 +197,14 @@ def evaluar_notificaciones_producto(producto_id):
             if p.es_paquete and p.producto_base_id:
                 base = sesion.query(Producto).filter(Producto.id == p.producto_base_id).first()
                 if base:
-                    info_bases[p.id] = {"nombre": base.nombre, "activo": base.activo}
+                    info_bases[p.id] = {"id": base.id, "nombre": base.nombre, "activo": base.activo}
+
+        datos_grupos = {}
+        for gid in grupos_a_evaluar:
+            activos_g = [m for m in productos if m.grupo_stock_id == gid and m.activo and not m.es_paquete]
+            datos_grupos[gid] = {
+                "miembros": [{"id": m.id, "nombre": m.nombre, "stock": m.stock} for m in activos_g]
+            }
     finally:
         sesion.close()
 
@@ -190,35 +228,42 @@ def evaluar_notificaciones_producto(producto_id):
                 tipo="BASE_INACTIVA",
                 prioridad="Alta",
                 descripcion=f"El paquete '{p.nombre}' está activo, pero su producto base '{base_info['nombre']}' está desactivado.",
-                entidad_id=p.id,
-                referencia_extra=p.nombre
+                entidad_id=base_info["id"],
+                referencia_extra=p.nombre,
+                reiniciar_ignoradas=reiniciar_ignoradas
             )
         else:
             cumplir_notificacion_por_clave(clave_base)
 
-        if p.stock < 0:
-            cumplir_notificacion_por_clave(clave_ago)
-            registrar_notificacion_entidad(
-                clave_unica=clave_neg,
-                tipo="STOCK_NEGATIVO",
-                prioridad="Alta",
-                descripcion=f"El producto '{p.nombre}' tiene stock negativo ({p.stock} uds). Verifica el inventario físico.",
-                entidad_id=p.id,
-                referencia_extra=p.nombre
-            )
-        elif p.stock == 0 and not p.es_paquete:
+        if p.es_paquete or p.grupo_stock_id:
             cumplir_notificacion_por_clave(clave_neg)
-            registrar_notificacion_entidad(
-                clave_unica=clave_ago,
-                tipo="STOCK_AGOTADO",
-                prioridad="Media",
-                descripcion=f"El producto '{p.nombre}' se quedó sin unidades disponibles (0 uds).",
-                entidad_id=p.id,
-                referencia_extra=p.nombre
-            )
+            cumplir_notificacion_por_clave(clave_ago)
         else:
-            cumplir_notificacion_por_clave(clave_neg)
-            cumplir_notificacion_por_clave(clave_ago)
+            if p.stock < 0:
+                cumplir_notificacion_por_clave(clave_ago)
+                registrar_notificacion_entidad(
+                    clave_unica=clave_neg,
+                    tipo="STOCK_NEGATIVO",
+                    prioridad="Alta",
+                    descripcion=f"El producto '{p.nombre}' tiene stock negativo ({p.stock} uds). Verifica el inventario físico.",
+                    entidad_id=p.id,
+                    referencia_extra=p.nombre,
+                    reiniciar_ignoradas=reiniciar_ignoradas
+                )
+            elif p.stock == 0:
+                cumplir_notificacion_por_clave(clave_neg)
+                registrar_notificacion_entidad(
+                    clave_unica=clave_ago,
+                    tipo="STOCK_AGOTADO",
+                    prioridad="Media",
+                    descripcion=f"El producto '{p.nombre}' se quedó sin unidades disponibles (0 uds).",
+                    entidad_id=p.id,
+                    referencia_extra=p.nombre,
+                    reiniciar_ignoradas=reiniciar_ignoradas
+                )
+            else:
+                cumplir_notificacion_por_clave(clave_neg)
+                cumplir_notificacion_por_clave(clave_ago)
 
         if p.costo == 0:
             registrar_notificacion_entidad(
@@ -227,11 +272,52 @@ def evaluar_notificaciones_producto(producto_id):
                 prioridad="Media",
                 descripcion=f"El producto '{p.nombre}' está registrado con costo $0.",
                 entidad_id=p.id,
-                referencia_extra=p.nombre
+                referencia_extra=p.nombre,
+                reiniciar_ignoradas=reiniciar_ignoradas
             )
         else:
             cumplir_notificacion_por_clave(clave_cos)
 
+    for gid, info in datos_grupos.items():
+        clave_g_neg = f"STOCK_NEGATIVO_GRUPO_{gid}"
+        clave_g_ago = f"STOCK_AGOTADO_GRUPO_{gid}"
+        miembros = info["miembros"]
+
+        if not miembros:
+            cumplir_notificacion_por_clave(clave_g_neg)
+            cumplir_notificacion_por_clave(clave_g_ago)
+            continue
+
+        stock_g = miembros[0]["stock"]
+        nombres = [m["nombre"] for m in miembros]
+        resumen_nombres = ", ".join(nombres) if len(nombres) <= 3 else f"{nombres[0]}, {nombres[1]} y {len(nombres) - 2} más"
+        rep = miembros[0]
+
+        if stock_g < 0:
+            cumplir_notificacion_por_clave(clave_g_ago)
+            registrar_notificacion_entidad(
+                clave_unica=clave_g_neg,
+                tipo="STOCK_NEGATIVO",
+                prioridad="Alta",
+                descripcion=f"El stock compartido ({resumen_nombres}) tiene stock negativo ({stock_g} uds). Verifica el inventario físico.",
+                entidad_id=rep["id"],
+                referencia_extra=rep["nombre"],
+                reiniciar_ignoradas=reiniciar_ignoradas
+            )
+        elif stock_g == 0:
+            cumplir_notificacion_por_clave(clave_g_neg)
+            registrar_notificacion_entidad(
+                clave_unica=clave_g_ago,
+                tipo="STOCK_AGOTADO",
+                prioridad="Media",
+                descripcion=f"El stock compartido ({resumen_nombres}) se quedó sin unidades disponibles (0 uds).",
+                entidad_id=rep["id"],
+                referencia_extra=rep["nombre"],
+                reiniciar_ignoradas=reiniciar_ignoradas
+            )
+        else:
+            cumplir_notificacion_por_clave(clave_g_neg)
+            cumplir_notificacion_por_clave(clave_g_ago)
 
 def sincronizar_notificaciones_sistema(reiniciar_ignoradas=False):
     """Sincroniza cajas incompletas, ventas guardadas de >= 1 día y reinicia alertas operativas ignoradas."""
@@ -254,7 +340,7 @@ def sincronizar_notificaciones_sistema(reiniciar_ignoradas=False):
         ).all()
         ids_cajas_incompletas = {c.id for c in cajas_incompletas}
 
-        limite_tiempo = datetime.now() - timedelta(seconds=10) #timedelta(days=1)
+        limite_tiempo = datetime.now() - timedelta(days=1)
         ventas_viejas = sesion.query(Venta).filter(
             Venta.pagado == False,
             Venta.metodo_pago == "Pendiente",
@@ -392,3 +478,9 @@ def limpiar_notificaciones_producto(producto_id):
     ]
     for clave in claves:
         cumplir_notificacion_por_clave(clave)
+
+
+def limpiar_notificaciones_grupo(grupo_id):
+    """Marca como cumplidas las notificaciones de un grupo de stock disuelto."""
+    cumplir_notificacion_por_clave(f"STOCK_NEGATIVO_GRUPO_{grupo_id}")
+    cumplir_notificacion_por_clave(f"STOCK_AGOTADO_GRUPO_{grupo_id}")

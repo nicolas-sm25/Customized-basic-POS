@@ -3,6 +3,7 @@ from dal.modelos.ventas import Venta, DetalleVenta
 from dal.modelos.productos import Producto
 from dal.modelos.contabilidad_caja import ContabilidadCaja
 from bll.gestor_notificaciones import evaluar_notificaciones_producto, cumplir_notificacion_por_tipo_entidad
+from bll.gestor_productos import ajustar_stock_producto
 from datetime import datetime
 
 
@@ -57,19 +58,7 @@ def registrar_venta(carrito, metodo_pago, caja_id, nombre_cliente=None, pagado=T
             sesion.add(detalle)
 
             if not item.get('recuperado'):
-                producto_db = sesion.query(Producto).filter(Producto.id == item['id']).first()
-
-                if producto_db:
-                    if producto_db.es_paquete and producto_db.producto_base_id:
-                        producto_base = sesion.query(Producto).filter(Producto.id == producto_db.producto_base_id).first()
-                        if producto_base:
-                            producto_base.stock -= (item['cantidad'] * producto_db.cantidad_por_paquete)
-                            producto_db.stock = producto_base.stock // producto_db.cantidad_por_paquete
-                    else:
-                        producto_db.stock -= item['cantidad']
-                        paquetes_vinculados = sesion.query(Producto).filter(Producto.producto_base_id == producto_db.id).all()
-                        for paquete in paquetes_vinculados:
-                            paquete.stock = producto_db.stock // paquete.cantidad_por_paquete
+                ajustar_stock_producto(sesion, item['id'], -item['cantidad'])
 
         nueva_venta.total = total_venta
         nueva_venta.ganancia_total = ganancia_venta
