@@ -28,7 +28,7 @@ def registrar_notificacion_entidad(clave_unica, tipo, prioridad, descripcion, en
             Notificacion.clave_unica == clave_unica
         ).order_by(Notificacion.id.desc()).all()
 
-        ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ahora = datetime.now()
 
         if existentes:
             principal = existentes[0]
@@ -43,10 +43,14 @@ def registrar_notificacion_entidad(clave_unica, tipo, prioridad, descripcion, en
 
             if principal.estado == "Cumplida":
                 principal.estado = "Activa"
-                principal.fecha = ahora
+                principal.fecha_creacion = ahora
+                principal.ignorada_por = None
+                principal.fecha_ignorada = None
             elif principal.estado == "Ignorada" and reiniciar_ignoradas:
                 principal.estado = "Activa"
-                principal.fecha = ahora
+                principal.fecha_creacion = ahora
+                principal.ignorada_por = None
+                principal.fecha_ignorada = None
         else:
             nueva = Notificacion(
                 clave_unica=clave_unica,
@@ -56,13 +60,14 @@ def registrar_notificacion_entidad(clave_unica, tipo, prioridad, descripcion, en
                 entidad_id=entidad_id,
                 referencia_extra=referencia_extra,
                 estado="Activa",
-                fecha=ahora
+                fecha_creacion=ahora
             )
             sesion.add(nueva)
 
         sesion.commit()
-    except Exception:
+    except Exception as e:
         sesion.rollback()
+        print(f"Error al registrar notificación ({clave_unica}): {e}")
     finally:
         sesion.close()
 
@@ -228,7 +233,7 @@ def evaluar_notificaciones_producto(producto_id, reiniciar_ignoradas=False):
                 tipo="BASE_INACTIVA",
                 prioridad="Alta",
                 descripcion=f"El paquete '{p.nombre}' está activo, pero su producto base '{base_info['nombre']}' está desactivado.",
-                entidad_id=base_info["id"],
+                entidad_id=p.id,
                 referencia_extra=p.nombre,
                 reiniciar_ignoradas=reiniciar_ignoradas
             )

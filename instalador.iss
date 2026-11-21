@@ -1,10 +1,10 @@
 [Setup]
 AppName=Sistema POS Tienda
-AppVersion=2.0
+AppVersion=2.0.1
 DefaultDirName={autopf}\POS_Tienda
 DefaultGroupName=Sistema POS Tienda
 OutputDir=Output
-OutputBaseFilename=Instalador_POS_v2.0
+OutputBaseFilename=Instalador_POS_v2.0.1
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
